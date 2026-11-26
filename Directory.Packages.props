@@ -1,0 +1,24 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Roslyn / Source Generator -->
+    <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.14.0" />
+
+    <!--
+      Test stack: xUnit v3 on Microsoft.Testing.Platform (required for .NET 10 SDK
+      `dotnet test`). Package xunit.v3.mtp-v2 targets MTP v2.
+      Microsoft.CodeAnalysis.CSharp.SourceGenerators.Testing was removed — unused
+      by driver-based tests and pulled a vulnerable System.Security.Cryptography.Pkcs.
+    -->
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
+    <PackageVersion Include="xunit.v3.mtp-v2" Version="4.0.3" />
+    <PackageVersion Include="Verify.XunitV3" Version="33.7.3" />
+    <PackageVersion Include="coverlet.collector" Version="10.1.1" />
+
+  </ItemGroup>
+</Project>
