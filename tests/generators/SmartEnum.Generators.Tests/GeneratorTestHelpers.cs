@@ -1,12 +1,15 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Text;
 using SmartEnum.Generators;
 
 namespace SmartEnum.Generators.Tests;
 
 internal static class GeneratorTestHelpers
 {
+    public static CSharpParseOptions ParseOptions { get; } = new(LanguageVersion.CSharp13);
+
     public static (GeneratorDriverRunResult Result, Compilation OutputCompilation) RunGenerator(string source)
         => RunGenerator(("Test.cs", source));
 
@@ -28,26 +31,10 @@ internal static class GeneratorTestHelpers
             throw new ArgumentNullException(nameof(additionalReferences));
         }
 
-        CSharpParseOptions parseOptions = new(LanguageVersion.CSharp13);
-        var syntaxTrees = new SyntaxTree[sources.Length];
-        for (int i = 0; i < sources.Length; i++)
-        {
-            syntaxTrees[i] = CSharpSyntaxTree.ParseText(
-                sources[i].Source,
-                parseOptions,
-                path: sources[i].FilePath);
-        }
-
-        var compilation = CSharpCompilation.Create(
-            assemblyName: "GeneratorTests",
-            syntaxTrees: syntaxTrees,
-            references: CreateMetadataReferences().AddRange(additionalReferences),
-            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-                .WithNullableContextOptions(NullableContextOptions.Enable));
-
+        Compilation compilation = CreateCompilation(additionalReferences, sources);
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             generators: [new SmartEnumGenerator().AsSourceGenerator()],
-            parseOptions: parseOptions);
+            parseOptions: ParseOptions);
 
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out Compilation outputCompilation, out _);
         return (driver.GetRunResult(), outputCompilation);
@@ -83,6 +70,43 @@ internal static class GeneratorTestHelpers
         }
 
         return result.Results[0].Exception;
+    }
+
+    public static Compilation CreateCompilation(
+        IReadOnlyCollection<MetadataReference> additionalReferences,
+        params (string FilePath, string Source)[] sources)
+    {
+        var syntaxTrees = new SyntaxTree[sources.Length];
+        for (int i = 0; i < sources.Length; i++)
+        {
+            syntaxTrees[i] = CSharpSyntaxTree.ParseText(
+                SourceText.From(sources[i].Source, System.Text.Encoding.UTF8),
+                ParseOptions,
+                path: sources[i].FilePath);
+        }
+
+        return CSharpCompilation.Create(
+            assemblyName: "GeneratorTests",
+            syntaxTrees: syntaxTrees,
+            references: CreateMetadataReferences().AddRange(additionalReferences),
+            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+                .WithNullableContextOptions(NullableContextOptions.Enable));
+    }
+
+    public static GeneratorDriver CreateTrackingDriver()
+        => CSharpGeneratorDriver.Create(
+            [new SmartEnumGenerator().AsSourceGenerator()],
+            parseOptions: ParseOptions,
+            driverOptions: new GeneratorDriverOptions(
+                disabledOutputs: IncrementalGeneratorOutputKind.None,
+                trackIncrementalGeneratorSteps: true));
+
+    public static (GeneratorDriver Driver, Compilation Compilation) RunTracked(
+        params (string FilePath, string Source)[] sources)
+    {
+        Compilation compilation = CreateCompilation([], sources);
+        GeneratorDriver driver = CreateTrackingDriver().RunGenerators(compilation);
+        return (driver, compilation);
     }
 
     public static ImmutableArray<Diagnostic> GeneratorDiagnostics(GeneratorDriverRunResult result)

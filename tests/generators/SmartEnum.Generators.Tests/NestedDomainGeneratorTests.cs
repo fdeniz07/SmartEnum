@@ -41,7 +41,7 @@ public sealed class NestedDomainGeneratorTests
         Assert.Contains("Demo.Holder.Status", diagnostic.GetMessage(), StringComparison.Ordinal);
         Assert.Equal(
             "Status",
-            diagnostic.Location.SourceTree!.GetText(TestContext.Current.CancellationToken).ToString(diagnostic.Location.SourceSpan));
+            source.Substring(diagnostic.Location.SourceSpan.Start, diagnostic.Location.SourceSpan.Length));
 
         Assert.Equal(1, GeneratorTestHelpers.GetGeneratedSourceCount(result));
         string generated = GeneratorTestHelpers.GetGeneratedSource(result)!;
