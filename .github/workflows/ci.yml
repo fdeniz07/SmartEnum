@@ -49,3 +49,120 @@ jobs:
 
       - name: Test NuGet Package Integration
         run: dotnet test tests/integration/SmartEnum.Package.IntegrationTests/SmartEnum.Package.IntegrationTests.csproj -c Release --no-build
+
+      - name: Pack shipping package
+        run: dotnet pack src/SmartEnum.Packaging/SmartEnum.Packaging.csproj -c Release --no-build -o artifacts/nuget
+
+      - name: Verify package artifacts
+        run: |
+          set -euo pipefail
+          NUPKG="artifacts/nuget/SmartEnum.1.0.0-preview.1.nupkg"
+          SNUPKG="artifacts/nuget/SmartEnum.1.0.0-preview.1.snupkg"
+          test -f "$NUPKG"
+          test -f "$SNUPKG"
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          import zipfile
+          from pathlib import Path
+
+          nupkg = Path("artifacts/nuget/SmartEnum.1.0.0-preview.1.nupkg")
+          snupkg = Path("artifacts/nuget/SmartEnum.1.0.0-preview.1.snupkg")
+
+          required_nupkg = {
+              "lib/net10.0/SmartEnum.dll",
+              "lib/net10.0/SmartEnum.xml",
+              "analyzers/dotnet/cs/SmartEnum.Generators.dll",
+              "analyzers/dotnet/cs/SmartEnum.Generators.pdb",
+              "README.md",
+              "package-icon.png",
+          }
+          expected_nupkg_binaries = [
+              "analyzers/dotnet/cs/SmartEnum.Generators.dll",
+              "analyzers/dotnet/cs/SmartEnum.Generators.pdb",
+              "lib/net10.0/SmartEnum.dll",
+          ]
+          expected_snupkg = {
+              "[Content_Types].xml",
+              "lib/net10.0/SmartEnum.pdb",
+              "SmartEnum.nuspec",
+          }
+          forbidden_symbol_metadata = {
+              "authors",
+              "owners",
+              "requireLicenseAcceptance",
+              "license",
+              "licenseUrl",
+              "icon",
+              "readme",
+          }
+
+          def local_name(tag):
+              return tag.rsplit("}", 1)[-1]
+
+          def read_names(path):
+              with zipfile.ZipFile(path) as archive:
+                  return {entry.replace("\\", "/") for entry in archive.namelist()}
+
+          def read_metadata(path):
+              with zipfile.ZipFile(path) as archive:
+                  entry_name = next(name for name in archive.namelist() if name.endswith(".nuspec"))
+                  root = ET.fromstring(archive.read(entry_name))
+              for child in list(root):
+                  if local_name(child.tag) == "metadata":
+                      return child
+              raise SystemExit(f"{path} is missing nuspec metadata")
+
+          names = read_names(nupkg)
+          missing = sorted(required_nupkg - names)
+          if missing:
+              raise SystemExit(f"nupkg missing entries: {missing}")
+          for name in names:
+              if "Packaging.dll" in name or "Microsoft.CodeAnalysis" in name or "SmartEnum.Core" in name:
+                  raise SystemExit(f"nupkg contains forbidden entry: {name}")
+              if name == "lib/net10.0/SmartEnum.pdb" or name.endswith("/SmartEnum.pdb") or name == "SmartEnum.pdb":
+                  raise SystemExit(f"nupkg contains Core PDB: {name}")
+          binaries = sorted(
+              name for name in names if name.lower().endswith((".dll", ".pdb"))
+          )
+          if binaries != expected_nupkg_binaries:
+              raise SystemExit(f"nupkg dll/pdb mismatch: {binaries}")
+
+          snupkg_names = read_names(snupkg)
+          if snupkg_names != expected_snupkg:
+              raise SystemExit(f"snupkg entries mismatch: {sorted(snupkg_names)}")
+
+          with zipfile.ZipFile(snupkg) as archive:
+              magic = archive.read("lib/net10.0/SmartEnum.pdb")[:4]
+          if magic != b"BSJB":
+              raise SystemExit(f"snupkg Core PDB is not portable (magic={magic!r})")
+
+          metadata = read_metadata(snupkg)
+          fields = {local_name(child.tag): child for child in list(metadata)}
+          if fields.get("id") is None or (fields["id"].text or "").strip() != "SmartEnum":
+              raise SystemExit("snupkg id is not SmartEnum")
+          if fields.get("version") is None or (fields["version"].text or "").strip() != "1.0.0-preview.1":
+              raise SystemExit("snupkg version is not 1.0.0-preview.1")
+          package_types = fields.get("packageTypes")
+          if package_types is None:
+              raise SystemExit("snupkg is missing packageTypes")
+          type_names = [
+              child.attrib.get("name")
+              for child in list(package_types)
+              if local_name(child.tag) == "packageType"
+          ]
+          if type_names != ["SymbolsPackage"]:
+              raise SystemExit(f"snupkg packageType mismatch: {type_names}")
+          present_forbidden = sorted(forbidden_symbol_metadata & set(fields))
+          if present_forbidden:
+              raise SystemExit(f"snupkg nuspec still contains {present_forbidden}")
+          print("Package layout smoke validation passed.")
+          PY
+
+      - name: Upload NuGet artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: nuget-packages
+          path: |
+            artifacts/nuget/*.nupkg
+            artifacts/nuget/*.snupkg
+          if-no-files-found: error

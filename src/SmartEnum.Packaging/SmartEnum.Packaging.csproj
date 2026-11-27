@@ -9,12 +9,23 @@
     <PackageId>SmartEnum</PackageId>
     <Version>1.0.0-preview.1</Version>
     <Authors>Fatih Deniz</Authors>
+    <Copyright>Copyright (c) Fatih Deniz</Copyright>
     <Description>Lightweight Smart Enum for .NET</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>package-icon.png</PackageIcon>
+    <PackageProjectUrl>https://github.com/fdeniz07/SmartEnum</PackageProjectUrl>
+    <PackageTags>smartenum;enum;dotnet;source-generator;roslyn</PackageTags>
+    <PackageReleaseNotes>Preview release of the single SmartEnum package (Core runtime + source generator). Not published to NuGet.org from this repository yet.</PackageReleaseNotes>
     <RepositoryUrl>https://github.com/fdeniz07/SmartEnum</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <!--
+      IncludeBuildOutput=false prevents SDK symbol collection from associating Core
+      PDBs with custom-packed lib assets. The main nupkg is built with explicit None
+      items; the Core .snupkg is created after Pack by create-core-snupkg.ps1.
+    -->
+    <IncludeSymbols>false</IncludeSymbols>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
   </PropertyGroup>
@@ -36,6 +47,7 @@
 
   <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="$(MSBuildThisFileDirectory)..\..\assets\branding\package-icon.png" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <!--
@@ -63,6 +75,11 @@
       <Output TaskParameter="TargetOutputs" ItemName="_GeneratorAssembly" />
     </MSBuild>
 
+    <ItemGroup>
+      <_CorePdb Include="@(_CoreAssembly->'%(RootDir)%(Directory)%(Filename).pdb')" />
+      <_GeneratorPdb Include="@(_GeneratorAssembly->'%(RootDir)%(Directory)%(Filename).pdb')" />
+    </ItemGroup>
+
     <Error
       Condition="'@(_CoreAssembly)' == '' or !Exists('%(_CoreAssembly.Identity)')"
       Text="Core GetTargetPath did not return an existing assembly." />
@@ -72,12 +89,44 @@
     <Error
       Condition="'@(_GeneratorAssembly)' == '' or !Exists('%(_GeneratorAssembly.Identity)')"
       Text="Generator GetTargetPath did not return an existing assembly." />
+    <Error
+      Condition="'@(_CorePdb)' == '' or !Exists('%(_CorePdb.Identity)')"
+      Text="Core portable PDB was not found next to the Core assembly." />
+    <Error
+      Condition="'@(_GeneratorPdb)' == '' or !Exists('%(_GeneratorPdb.Identity)')"
+      Text="Generator portable PDB was not found next to the Generator assembly." />
+
+    <PropertyGroup>
+      <_ShippingCorePdb>%(_CorePdb.Identity)</_ShippingCorePdb>
+    </PropertyGroup>
 
     <ItemGroup>
       <None Include="@(_CoreAssembly)" Pack="true" PackagePath="lib/net10.0/%(Filename)%(Extension)" />
       <None Include="@(_CoreDocumentation)" Pack="true" PackagePath="lib/net10.0/%(Filename)%(Extension)" />
       <None Include="@(_GeneratorAssembly)" Pack="true" PackagePath="analyzers/dotnet/cs/%(Filename)%(Extension)" />
+      <!-- Generator symbols ship in the main nupkg beside the analyzer DLL (not in the .snupkg). -->
+      <None Include="@(_GeneratorPdb)" Pack="true" PackagePath="analyzers/dotnet/cs/%(Filename)%(Extension)" />
     </ItemGroup>
+  </Target>
+
+  <Target Name="CreateCoreSymbolPackage" AfterTargets="Pack" DependsOnTargets="_GetAbsoluteOutputPathsForPack;IncludeShippingOutputs">
+    <PropertyGroup>
+      <_NupkgPath>$([System.IO.Path]::Combine('$(PackageOutputAbsolutePath)', '$(PackageId).$(PackageVersion).nupkg'))</_NupkgPath>
+      <_SnupkgPath>$([System.IO.Path]::Combine('$(PackageOutputAbsolutePath)', '$(PackageId).$(PackageVersion).snupkg'))</_SnupkgPath>
+      <_CreateScript>$(MSBuildThisFileDirectory)create-core-snupkg.ps1</_CreateScript>
+      <_PowerShellExe Condition="'$(PowerShellExe)' == '' and Exists('$(ProgramFiles)\PowerShell\7\pwsh.exe')">$(ProgramFiles)\PowerShell\7\pwsh.exe</_PowerShellExe>
+      <_PowerShellExe Condition="'$(PowerShellExe)' == ''">pwsh</_PowerShellExe>
+    </PropertyGroup>
+
+    <!-- Prefer Windows PowerShell when pwsh is unavailable (local Windows agents). -->
+    <PropertyGroup Condition="!$([System.IO.File]::Exists('$(_PowerShellExe)')) and '$(OS)' == 'Windows_NT'">
+      <_PowerShellExe>powershell</_PowerShellExe>
+    </PropertyGroup>
+
+    <Error Condition="!Exists('$(_NupkgPath)')" Text="Expected package was not produced: $(_NupkgPath)" />
+    <Error Condition="'$(_ShippingCorePdb)' == '' or !Exists('$(_ShippingCorePdb)')" Text="Core PDB path was not captured for symbol package creation." />
+
+    <Exec Command="&quot;$(_PowerShellExe)&quot; -NoProfile -File &quot;$(_CreateScript)&quot; -NupkgPath &quot;$(_NupkgPath)&quot; -CorePdbPath &quot;$(_ShippingCorePdb)&quot; -SymbolPackagePath &quot;$(_SnupkgPath)&quot;" />
   </Target>
 
 </Project>

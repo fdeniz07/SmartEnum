@@ -6,13 +6,13 @@ Examples align with `tests/integration/SmartEnum.Generator.IntegrationTests` and
 
 ## Package installation
 
-Add a single package reference. The package contains the Core runtime, XML docs, and the generator under `analyzers/dotnet/cs`. There is no separate `SmartEnum.Generators` package to install.
+Add a single package reference. The package contains the Core runtime, XML docs, the generator under `analyzers/dotnet/cs`, and the package icon. There is no separate `SmartEnum.Generators` package to install.
 
 ```xml
 <PackageReference Include="SmartEnum" Version="1.0.0-preview.1" />
 ```
 
-> **Publication caveat:** Preview packaging is implemented in this repository (`1.0.0-preview.1`). This document does **not** claim the package is already on NuGet.org. Use a feed that hosts the packed nupkg, or pack locally as shown below.
+> **Publication caveat:** Preview packaging is implemented in this repository (`1.0.0-preview.1`). This document does **not** claim the package is already on NuGet.org. Use a feed that hosts the packed nupkg, or pack locally as shown below. Contributor checklist: [release/nuget-preview-checklist.md](release/nuget-preview-checklist.md).
 
 ### Pack and consume from a local feed
 
@@ -22,7 +22,12 @@ Work from the repository root. Pack the shipping project (`src/SmartEnum.Packagi
 dotnet pack src/SmartEnum.Packaging/SmartEnum.Packaging.csproj -c Release -o ./artifacts/local-feed
 ```
 
-This writes `SmartEnum.1.0.0-preview.1.nupkg` to `./artifacts/local-feed` relative to the repo root.
+This writes:
+
+- `SmartEnum.1.0.0-preview.1.nupkg` — runtime, XML docs, generator DLL + generator PDB, README, package icon
+- `SmartEnum.1.0.0-preview.1.snupkg` — Core portable PDB (`lib/net10.0/SmartEnum.pdb`) for SourceLink
+
+to `./artifacts/local-feed` relative to the repo root. Consume the **nupkg** from your feed; keep the snupkg alongside when you publish symbols later.
 
 Place (or create) a `nuget.config` in the **repository root**. Relative package source paths are resolved against that config file’s directory, so `./artifacts/local-feed` means `<repo-root>/artifacts/local-feed`. Keep other required sources available (for example nuget.org for test SDK packages); do not add `<clear />` unless you also configure every source the consumer needs:
 

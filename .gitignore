@@ -6,6 +6,9 @@
 [Dd]ebug/
 [Dd]ebugPublic/
 [Rr]elease/
+# Keep documentation under docs/release/ (otherwise matched by [Rr]elease/).
+!docs/release/
+!docs/release/**
 [Rr]eleases/
 x64/
 x86/

@@ -30,11 +30,15 @@ The shipping package id is **`SmartEnum`**. It is produced by `src/SmartEnum.Pac
 | Core runtime | `lib/net10.0/SmartEnum.dll` |
 | XML documentation | `lib/net10.0/SmartEnum.xml` |
 | Source generator | `analyzers/dotnet/cs/SmartEnum.Generators.dll` |
+| Generator symbols | `analyzers/dotnet/cs/SmartEnum.Generators.pdb` (inside the main nupkg) |
 | Package readme | `README.md` |
+| Package icon | `package-icon.png` |
+
+Core portable symbols ship in a companion **`.snupkg`** as `lib/net10.0/SmartEnum.pdb` (not inside the main nupkg). SourceLink uses the .NET 10 SDK built-in repository metadata—no explicit `Microsoft.SourceLink.GitHub` package reference.
 
 There is **no** separately distributed `SmartEnum.Generators` package. One `PackageReference` to `SmartEnum` restores both the runtime types and the analyzer.
 
-> **Publication status:** The package layout is implemented in this repository (preview version `1.0.0-preview.1`). It is **not** claimed to be published on NuGet.org from this documentation. Until a public feed listing is available, build from source or consume a locally packed nupkg.
+> **Publication status:** The package layout is implemented in this repository (preview version `1.0.0-preview.1`). It is **not** claimed to be published on NuGet.org from this documentation. Until a public feed listing is available, build from source or consume a locally packed nupkg. Preview release checklist: [docs/release/nuget-preview-checklist.md](docs/release/nuget-preview-checklist.md).
 
 Intended consumer reference (when the package is available on your feed):
 
@@ -155,6 +159,7 @@ dotnet test SmartEnum.slnx -c Release --no-build
 
 ```text
 SmartEnum/
+├── assets/branding/                       # Logo, symbol, package icon
 ├── src/
 │   ├── SmartEnum/                         # Core runtime
 │   ├── SmartEnum.Generators/              # Source generator
@@ -167,6 +172,7 @@ SmartEnum/
 │       └── SmartEnum.Package.IntegrationTests/
 ├── docs/
 │   ├── USAGE.md
+│   ├── release/nuget-preview-checklist.md
 │   ├── architecture/decisions/            # ADRs (including ADR-006)
 │   └── design/SOURCE_GENERATOR.md
 ├── .github/workflows/ci.yml
@@ -181,6 +187,7 @@ SmartEnum/
 | Document | Content |
 | --- | --- |
 | [docs/USAGE.md](docs/USAGE.md) | Consumer usage, lookup, equality, limitations |
+| [docs/release/nuget-preview-checklist.md](docs/release/nuget-preview-checklist.md) | Preview pack / symbol validation checklist |
 | [docs/design/SOURCE_GENERATOR.md](docs/design/SOURCE_GENERATOR.md) | Generator design and diagnostics |
 | [docs/architecture/decisions/README.md](docs/architecture/decisions/README.md) | Accepted ADRs |
 | [ADR-006](docs/architecture/decisions/ADR-006-single-nuget-package-distribution.md) | Single NuGet package distribution |
