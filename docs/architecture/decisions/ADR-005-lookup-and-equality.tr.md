@@ -9,7 +9,7 @@
 | İlgili kararlar | ADR-002, ADR-003, ADR-004 |
 | İngilizce | [ADR-005-lookup-and-equality.md](ADR-005-lookup-and-equality.md) |
 
-Bu belge, kabul edilmiş Lookup ve Equality sözleşmesini tanımlar. API henüz uygulanmamıştır ve uygulanmış API sayılmamalıdır.
+Bu belge, kabul edilmiş Lookup ve Equality sözleşmesini tanımlar. Lookup ve Equality API'si uygulanmıştır. Bu ADR artık uygulanmış API'nin kabul edilmiş sözleşmesini tanımlar.
 
 [ADR-004](ADR-004-registry-public-access.md) vardır ve **Kabul edildi (Accepted)** durumundadır. Public Registry erişim kararını belgeler: `SmartEnum<TEnum, TValue>.Registry` tek public giriş noktasıdır ve `SmartEnumRegistry<TEnum, TValue>.Instance` internal'dır.
 

@@ -9,7 +9,7 @@
 | Related | ADR-002, ADR-003, ADR-004 |
 | Turkish | [ADR-005-lookup-and-equality.tr.md](ADR-005-lookup-and-equality.tr.md) |
 
-This document defines the accepted Lookup and Equality contract. The API is not implemented yet and must not be treated as implemented API.
+This document defines the accepted Lookup and Equality contract. The Lookup and Equality API has been implemented. This ADR now documents the accepted contract of the implemented API.
 
 [ADR-004](ADR-004-registry-public-access.md) exists and is **Accepted**. It documents the public Registry access decision: `SmartEnum<TEnum, TValue>.Registry` is the only public entry point, and `SmartEnumRegistry<TEnum, TValue>.Instance` is internal.
 
