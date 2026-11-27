@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/branding/smartenum-logo.png" alt="SmartEnum Logo" width="180">
+</p>
+
 # SmartEnum
 
 **Lightweight Smart Enum for .NET**
