@@ -48,4 +48,4 @@ Başarısız `Lazy<T>` başlatması önbelleğe alınır. Sonraki erişim aynı 
 
 ## Kurucu argüman bağlama (generator)
 
-Tekillik diagnostics’i, nesne oluşturma argümanlarını seçilen kurucunun `IParameterSymbol` değerine bağlar (herhangi bir sıradaki named argument’ler ve opsiyonel parametreler dahil). Sabitler yalnızca operation constant value üzerinden okunur. Parametreler, public kurucu adları olan `name` ve `value` ile tanınır.
+Tekillik diagnostics’i, nesne oluşturma argümanlarını seçilen kurucunun `IParameterSymbol` değerine bağlar (herhangi bir sıradaki named argument’ler ve opsiyonel parametreler dahil). Sabitler `SemanticModel.GetConstantValue` ile okunur. Parametreler `name` ve `value` adlarıyla tanınır. Seçilen kurucunun public olması gerekmez. `tests/integration/SmartEnum.Generator.IntegrationTests/OrderStatus.cs` bu parametre adlarına sahip private bir kurucu kullanır.

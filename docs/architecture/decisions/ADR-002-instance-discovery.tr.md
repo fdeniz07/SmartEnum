@@ -77,7 +77,7 @@ Milestone 1, trimming ve Native AOT **hedefleriyle** uyumlu bir mimariyi doğrul
 
 ## Geçici teknik seçimler (henüz ürün politikası olarak “Kabul edildi” değil)
 
-- SMARTENUM001/002 dışındaki kesin diagnostic kimlik kataloğu.
+- SMARTENUM001 ve SMARTENUM002, bu karardaki ilk keşif tanılarıdır. SMARTENUM003, SMARTENUM004 ve SMARTENUM005 daha sonra ADR-003 ile kabul edildi. Beş tanı da uygulanmıştır. Bu ADR’deki keşif mimarisi değişmez.
 - Nihai NuGet paketleme şekli (tek paket vs Core + Generators).
 - `ISmartEnumGenerated<T>` uzun vadede `SmartEnum.Internal` içinde kalacak mı.
 - Nested türler ve açık generic alanlar için destek matrisi.

@@ -117,7 +117,7 @@ ADR-004 only narrows who may call the lazy factory. It does not change:
 - cached initialization failures
 - the public `Items` collection
 
-ADR-002 remains the discovery decision. ADR-005 (Lookup and Equality) stays **Proposed** and is outside this decision.
+ADR-002 remains the discovery decision. ADR-005 (Lookup and Equality) is **Accepted**. It remains outside this decision.
 
 ## References
 

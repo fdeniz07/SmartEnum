@@ -117,7 +117,7 @@ ADR-004 yalnızca lazy fabrikayı kimin çağırabileceğini daraltır. Şunlar�
 - önbelleğe alınan initialization hataları
 - public `Items` koleksiyonu
 
-ADR-002 keşif kararı olarak kalır. ADR-005 (Lookup ve Equality) **Önerildi (Proposed)** durumundadır ve bu kararın dışındadır.
+ADR-002 keşif kararı olarak kalır. ADR-005 (Lookup ve Equality) **Kabul edildi (Accepted)** durumundadır. Bu kararın dışında kalır.
 
 ## Referanslar
 

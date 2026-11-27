@@ -48,4 +48,4 @@ Failed `Lazy<T>` initialization is cached. A later access throws the same except
 
 ## Constructor argument binding (generator)
 
-Uniqueness diagnostics bind object-creation arguments to the selected constructor’s `IParameterSymbol` (including named arguments in any order and optional parameters). Constants are read only via operation constant values. Parameters are recognized by the public constructor names `name` and `value`.
+Uniqueness diagnostics bind object-creation arguments to the selected constructor’s `IParameterSymbol` (including named arguments in any order and optional parameters). Constants are read with `SemanticModel.GetConstantValue`. Parameters are recognized by the names `name` and `value`. The selected constructor does not have to be public. `tests/integration/SmartEnum.Generator.IntegrationTests/OrderStatus.cs` uses a private constructor with those parameter names.

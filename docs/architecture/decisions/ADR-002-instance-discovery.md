@@ -77,7 +77,7 @@ Milestone 1 must validate an architecture that remains compatible with trimming 
 
 ## Provisional technical choices (not yet “Accepted” product policy)
 
-- Exact diagnostic ID catalog beyond SMARTENUM001/002.
+- SMARTENUM001 and SMARTENUM002 are the initial discovery diagnostics from this decision. SMARTENUM003, SMARTENUM004, and SMARTENUM005 were subsequently accepted in ADR-003. All five diagnostics are implemented. The discovery architecture in this ADR is unchanged.
 - Final NuGet packaging shape (single package vs Core + Generators).
 - Whether `ISmartEnumGenerated<T>` remains in `SmartEnum.Internal` long term.
 - Support matrix for nested types and open generic domains.
