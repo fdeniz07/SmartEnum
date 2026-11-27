@@ -100,6 +100,49 @@ public sealed class EqualityOperatorCompilationTests
         Assert.Equal("CS0019", cross.Id);
     }
 
+    [Fact]
+    public void Derived_type_cannot_override_sealed_object_equality()
+    {
+        const string source = """
+            using SmartEnum;
+
+            namespace Demo;
+
+            public partial class Status : SmartEnum<Status, int>
+            {
+                public static readonly Status Pending = new("Pending", 1);
+
+                protected Status(string name, int value)
+                    : base(name, value)
+                {
+                }
+            }
+
+            public sealed class Child : Status
+            {
+                public Child()
+                    : base("Child", 2)
+                {
+                }
+
+                public override bool Equals(object? obj) => false;
+
+                public override int GetHashCode() => 0;
+            }
+            """;
+
+        (_, Compilation output) = GeneratorTestHelpers.RunGenerator(source);
+        Diagnostic[] diagnostics = output
+            .GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity is DiagnosticSeverity.Warning or DiagnosticSeverity.Error)
+            .ToArray();
+
+        Assert.Equal(2, diagnostics.Length);
+        Assert.All(diagnostics, static diagnostic => Assert.Equal("CS0239", diagnostic.Id));
+        Assert.Contains(diagnostics, static diagnostic => diagnostic.GetMessage().Contains("Equals", StringComparison.Ordinal));
+        Assert.Contains(diagnostics, static diagnostic => diagnostic.GetMessage().Contains("GetHashCode", StringComparison.Ordinal));
+    }
+
     private static Compilation Compile(string consumer)
     {
         (_, Compilation output) = GeneratorTestHelpers.RunGenerator(("Domains.cs", Domains));

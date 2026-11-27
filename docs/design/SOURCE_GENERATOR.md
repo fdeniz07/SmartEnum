@@ -9,7 +9,7 @@
 
 This document describes the Source Generator architecture validated in Milestone 1. It distinguishes **Accepted** decisions from **provisional** technical choices. Unapproved product proposals are not marked Accepted.
 
-Lookup, equality, and diagnostics SMARTENUM003 through SMARTENUM005 were implemented after Milestone 1. Those facts are recorded below. This document does not change ADR-002.
+Lookup, equality, and diagnostics SMARTENUM003 through SMARTENUM005 were implemented after Milestone 1. SMARTENUM006 rejects nested domain types and emits no source for them. Those facts are recorded below. This document does not change ADR-002.
 
 ## 1. Context and problem
 
@@ -140,7 +140,7 @@ Generator:
 - Compile-time discovery of `public static readonly` domain fields.
 - The generated `ISmartEnumGenerated<T>` implementation.
 - The static instance array.
-- Diagnostics SMARTENUM001 through SMARTENUM005.
+- Diagnostics SMARTENUM001 through SMARTENUM006.
 
 Core (`src/SmartEnum`):
 
@@ -153,14 +153,15 @@ Core (`src/SmartEnum`):
 
 1. Syntax predicate: class/record with a base list.
 2. Semantic filter: base type identity is `SmartEnum.SmartEnum<TEnum, TValue>` where `TEnum` is the declaring type (namespace + metadata identity, not stringly matching alone).
-3. Require `partial` (else SMARTENUM001). A non-partial domain does not receive generated discovery source.
-4. Collect `public static readonly` fields whose type equals the domain type.
-5. Ignore unrelated static fields (`string`, `int`, etc.).
-6. Report SMARTENUM002 for `public static` domain-typed fields that are not `readonly`. Those fields are left out of the generated array.
-7. Report SMARTENUM003 and SMARTENUM004 when the constructor arguments named `name` and `value` are duplicate compile-time constants.
-8. Report SMARTENUM005 when no valid instance field remains. Generation still emits an empty array. The diagnostic severity is Error, so the consumer compilation fails.
+3. If the domain is nested inside another type, report SMARTENUM006 and do not generate source. No other SmartEnum diagnostic is reported for that domain.
+4. Require `partial` (else SMARTENUM001). A non-partial domain does not receive generated discovery source.
+5. Collect `public static readonly` fields whose type equals the domain type.
+6. Ignore unrelated static fields (`string`, `int`, etc.).
+7. Report SMARTENUM002 for `public static` domain-typed fields that are not `readonly`. Those fields are left out of the generated array.
+8. Report SMARTENUM003 and SMARTENUM004 when the constructor arguments named `name` and `value` are duplicate compile-time constants.
+9. Report SMARTENUM005 when no valid instance field remains. Generation still emits an empty array. The diagnostic severity is Error, so the consumer compilation fails.
 
-Verified declaration shape: a top-level, non-generic `partial` class. Nested types and open generic domains are not a supported claim.
+Verified declaration shape: a top-level, non-generic `partial` class. Nested SmartEnum domains are rejected with SMARTENUM006 and do not receive generated source. Open generic domains are not supported.
 
 ### Diagnostic catalogue
 
@@ -173,8 +174,9 @@ Every descriptor is category `SmartEnum.Generators`, severity Error, and enabled
 | SMARTENUM003 | Duplicate SmartEnum Name | Two valid fields pass the same compile-time constant to the parameter named `name`. Comparison is ordinal. | `SmartEnum domain '{0}' declares duplicate Name '{1}' on fields '{2}' and '{3}'` |
 | SMARTENUM004 | Duplicate SmartEnum Value | Two valid fields pass the same non-null compile-time constant to the parameter named `value`. | `SmartEnum domain '{0}' declares duplicate Value '{1}' on fields '{2}' and '{3}'` |
 | SMARTENUM005 | SmartEnum domain has no instances | The domain has no valid `public static readonly` instance. | `SmartEnum domain '{0}' has no valid public static readonly instances` |
+| SMARTENUM006 | Nested SmartEnum domain types are not supported | The domain is nested inside another type. No source is generated for it. | `SmartEnum domain '{0}' is nested inside another type and is not supported; declare the domain as a top-level type` |
 
-A `name` or `value` argument that is not a compile-time constant is skipped by SMARTENUM003 and SMARTENUM004. Runtime registry validation still rejects duplicate names and values. The selected constructor does not have to be public. Parameters are recognized by the names `name` and `value`. Constants are read with `SemanticModel.GetConstantValue`.
+A `name` or `value` argument that is not a compile-time constant is skipped by SMARTENUM003 and SMARTENUM004. Runtime registry validation still rejects duplicate names and values. The selected constructor does not have to be public. Parameters are recognized by the names `name` and `value`. Argument binding uses the compiler's object-creation operation (`IObjectCreationOperation` and `IArgumentOperation.Parameter`). Constants come from that argument operation, including an omitted optional parameter's explicit compile-time default.
 
 ### Emission
 
@@ -245,9 +247,9 @@ See ADR-002. Summary: reflection, manual registry, and `ModuleInitializer` were 
 ## 15. Generator limitations
 
 - Top-level, non-generic domains are the verified path.
-- Nested types and open generic domains are not claimed supported.
+- Nested SmartEnum domains are rejected with SMARTENUM006. No source is generated for them. Open generic domains are not supported.
 - The generator does not generate lookup, equality, or serialization. Lookup and equality are implemented on Core.
-- Diagnostics SMARTENUM001 through SMARTENUM005 are implemented.
+- Diagnostics SMARTENUM001 through SMARTENUM006 are implemented.
 - The generator is referenced by integration tests as an Analyzer `ProjectReference`. NuGet bundling is provisional.
 
 ## 16. Test strategy
@@ -277,7 +279,7 @@ Integration.Tests         — references Core + Generators as Analyzer
 ## 18. Future extension considerations (provisional)
 
 - Bundle the generator into the Core NuGet package as an analyzer.
-- Nested and open-generic domain support, with tests, before claiming that support.
+- Nested domain generation is not implemented. Nested domains are rejected with SMARTENUM006. Open-generic domain support remains future work.
 - Dedicated Native AOT / trim validation.
 
 Lookup and equality are already implemented in Core. The generator does not generate those members. Duplicate name and value diagnostics SMARTENUM003 and SMARTENUM004 are already implemented for compile-time constants.
@@ -292,7 +294,7 @@ Lookup and equality are already implemented in Core. The generator does not gene
 | Static abstract dispatch | Accepted |
 | No ModuleInitializer discovery | Accepted |
 | CS9203-safe static array emission | Provisional implementation detail (correctness-driven) |
-| Diagnostic IDs SMARTENUM001–SMARTENUM005 | Implemented. 001 and 002 come from this discovery design. 003, 004, and 005 were accepted in ADR-003. |
+| Diagnostic IDs SMARTENUM001–SMARTENUM006 | Implemented. 001 and 002 come from this discovery design. 003, 004, and 005 were accepted in ADR-003. 006 rejects nested domains. |
 | NuGet packaging topology | Provisional |
-| Nested/generic domains | Out of Milestone 1 claim |
+| Nested domains | Rejected by SMARTENUM006. Open generic domains remain outside the current claim. |
 | Native AOT proven | Not claimed |

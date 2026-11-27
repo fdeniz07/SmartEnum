@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 using Microsoft.CodeAnalysis.Text;
 
 namespace SmartEnum.Generators;
@@ -116,6 +117,15 @@ public sealed class SmartEnumGenerator : IIncrementalGenerator
         DomainCandidate candidate,
         Compilation compilation)
     {
+        if (candidate.TypeSymbol.ContainingType is not null)
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                SmartEnumDiagnostics.NestedDomainUnsupported,
+                candidate.TypeLocation,
+                candidate.TypeSymbol.ToDisplayString()));
+            return;
+        }
+
         if (!candidate.IsPartial)
         {
             context.ReportDiagnostic(Diagnostic.Create(
@@ -395,8 +405,8 @@ public sealed class SmartEnumGenerator : IIncrementalGenerator
 
             if (symbol.TypeParameters.Length > 0)
             {
-                // Prototype: preserve declared type parameters when present.
-                // Nested/generic domain support is not claimed as complete in Milestone 1.
+                // Open generic domains are not supported. Nested domains are rejected
+                // before source is emitted.
                 typeParameters = "<" + string.Join(", ", symbol.TypeParameters.Select(static tp => tp.Name)) + ">";
                 constraints = BuildConstraints(symbol);
             }
@@ -530,82 +540,93 @@ public sealed class SmartEnumGenerator : IIncrementalGenerator
                     continue;
                 }
 
-                ArgumentListSyntax? arguments = initializer switch
-                {
-                    ObjectCreationExpressionSyntax { ArgumentList: { } list } => list,
-                    ImplicitObjectCreationExpressionSyntax { ArgumentList: { } list } => list,
-                    _ => null,
-                };
-
-                if (arguments is null)
+                if (initializer is not (ObjectCreationExpressionSyntax or ImplicitObjectCreationExpressionSyntax))
                 {
                     continue;
                 }
 
                 SemanticModel model = compilation.GetSemanticModel(initializer.SyntaxTree);
-                if (model.GetSymbolInfo(initializer).Symbol is not IMethodSymbol constructor)
+                if (AsObjectCreation(model.GetOperation(initializer)) is not IObjectCreationOperation creation
+                    || creation.Constructor is not { } constructor)
                 {
                     continue;
                 }
 
-                // Map syntax arguments onto the selected constructor's parameters.
-                // Named arguments may appear in any order. Omitted optional parameters
-                // keep their explicit default when that default is a constant.
-                Dictionary<IParameterSymbol, ExpressionSyntax> bound =
-                    new(SymbolEqualityComparer.Default);
-                int positionalIndex = 0;
-                foreach (ArgumentSyntax argument in arguments.Arguments)
+                // The operation's constructor is the overload the compiler selected.
+                // Each argument's Parameter is the parameter that argument was bound to.
+                HashSet<IParameterSymbol> bound = new(SymbolEqualityComparer.Default);
+                foreach (IArgumentOperation argument in creation.Arguments)
                 {
-                    IParameterSymbol? parameter = argument.NameColon is { } nameColon
-                        ? constructor.Parameters.FirstOrDefault(p => p.Name == nameColon.Name.Identifier.ValueText)
-                        : positionalIndex < constructor.Parameters.Length
-                            ? constructor.Parameters[positionalIndex]
-                            : null;
-
-                    if (argument.NameColon is null)
+                    IParameterSymbol? parameter = argument.Parameter;
+                    if (parameter is null)
                     {
-                        positionalIndex++;
+                        continue;
                     }
 
-                    if (parameter is not null)
+                    bound.Add(parameter);
+                    if (TryGetArgumentConstant(argument, out object? constant))
                     {
-                        bound[parameter] = argument.Expression;
+                        AssignConstant(parameter, constant, ref constantName, ref constantValue);
                     }
                 }
 
                 foreach (IParameterSymbol parameter in constructor.Parameters)
                 {
-                    object? constant = null;
-                    bool hasConstant = false;
-
-                    if (bound.TryGetValue(parameter, out ExpressionSyntax? expression))
-                    {
-                        Optional<object?> folded = model.GetConstantValue(expression);
-                        hasConstant = folded.HasValue;
-                        constant = folded.Value;
-                    }
-                    else if (parameter.HasExplicitDefaultValue)
-                    {
-                        hasConstant = true;
-                        constant = parameter.ExplicitDefaultValue;
-                    }
-
-                    if (!hasConstant)
+                    if (bound.Contains(parameter) || !parameter.HasExplicitDefaultValue)
                     {
                         continue;
                     }
 
-                    if (parameter.Name == "name" && constant is string name)
-                    {
-                        constantName = name;
-                    }
-                    else if (parameter.Name == "value" && constant is not null)
-                    {
-                        constantValue = constant;
-                    }
+                    AssignConstant(parameter, parameter.ExplicitDefaultValue, ref constantName, ref constantValue);
                 }
 
                 return;
+            }
+        }
+
+        private static IObjectCreationOperation? AsObjectCreation(IOperation? operation)
+        {
+            while (operation is IConversionOperation conversion)
+            {
+                operation = conversion.Operand;
+            }
+
+            return operation as IObjectCreationOperation;
+        }
+
+        private static bool TryGetArgumentConstant(IArgumentOperation argument, out object? constant)
+        {
+            Optional<object?> folded = argument.Value.ConstantValue;
+            if (folded.HasValue)
+            {
+                constant = folded.Value;
+                return true;
+            }
+
+            if (argument.ArgumentKind == ArgumentKind.DefaultValue
+                && argument.Parameter?.HasExplicitDefaultValue == true)
+            {
+                constant = argument.Parameter.ExplicitDefaultValue;
+                return true;
+            }
+
+            constant = null;
+            return false;
+        }
+
+        private static void AssignConstant(
+            IParameterSymbol parameter,
+            object? constant,
+            ref string? constantName,
+            ref object? constantValue)
+        {
+            if (parameter.Name == "name" && constant is string name)
+            {
+                constantName = name;
+            }
+            else if (parameter.Name == "value" && constant is not null)
+            {
+                constantValue = constant;
             }
         }
     }

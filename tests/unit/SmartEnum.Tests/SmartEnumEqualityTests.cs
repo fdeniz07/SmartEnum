@@ -1,3 +1,5 @@
+using System.Reflection;
+
 namespace SmartEnum.Tests;
 
 public sealed class SmartEnumEqualityTests
@@ -33,6 +35,18 @@ public sealed class SmartEnumEqualityTests
         Assert.DoesNotContain(Status.List, static item => item.Name == "Twin");
         Assert.Same(Status.Pending, Status.FromValue(1));
         Assert.True(Status.Pending == twin);
+    }
+
+    [Fact]
+    public void Object_equality_members_are_sealed()
+    {
+        MethodInfo equals = typeof(Status).GetMethod(nameof(object.Equals), [typeof(object)])!;
+        MethodInfo hashCode = typeof(Status).GetMethod(nameof(object.GetHashCode), Type.EmptyTypes)!;
+
+        Assert.True(equals.IsFinal);
+        Assert.True(hashCode.IsFinal);
+        Assert.Equal(typeof(SmartEnum<Status, int>), equals.DeclaringType);
+        Assert.Equal(typeof(SmartEnum<Status, int>), hashCode.DeclaringType);
     }
 
     [Fact]

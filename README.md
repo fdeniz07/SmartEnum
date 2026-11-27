@@ -61,7 +61,7 @@ public sealed partial class OrderStatus : SmartEnum<OrderStatus, int>
 
 ## What the generator does
 
-`src/SmartEnum.Generators` is an incremental Roslyn generator. For each eligible `partial` domain it emits `ISmartEnumGenerated<T>` and a static array of the `public static readonly` fields. Diagnostics are SMARTENUM001 through SMARTENUM005. Details are in [docs/design/SOURCE_GENERATOR.md](docs/design/SOURCE_GENERATOR.md).
+`src/SmartEnum.Generators` is an incremental Roslyn generator. For each eligible `partial` domain it emits `ISmartEnumGenerated<T>` and a static array of the `public static readonly` fields. Diagnostics are SMARTENUM001 through SMARTENUM006. Details are in [docs/design/SOURCE_GENERATOR.md](docs/design/SOURCE_GENERATOR.md).
 
 Core, in `src/SmartEnum`, owns registry validation, lookup, equality, and the runtime exceptions. The generator does not emit those APIs.
 

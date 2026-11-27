@@ -162,15 +162,16 @@ public abstract class SmartEnum<TEnum, TValue> : IEquatable<TEnum>
     /// </summary>
     /// <param name="obj">Object to compare.</param>
     /// <returns><see langword="true"/> when <paramref name="obj"/> is a <typeparamref name="TEnum"/> with an equal value.</returns>
-    public override bool Equals(object? obj)
+    /// <remarks>This override is sealed. A derived type cannot replace the domain-and-value contract used by <c>==</c>.</remarks>
+    public sealed override bool Equals(object? obj)
         => obj is TEnum other && Equals(other);
 
     /// <summary>
     /// Returns a hash code for the domain type and value.
     /// </summary>
     /// <returns>The result of <see cref="HashCode.Combine{T1, T2}(T1, T2)"/> for <c>typeof(TEnum)</c> and <see cref="Value"/>.</returns>
-    /// <remarks>This hash is not a durable identifier.</remarks>
-    public override int GetHashCode()
+    /// <remarks>This override is sealed. This hash is not a durable identifier.</remarks>
+    public sealed override int GetHashCode()
         => HashCode.Combine(typeof(TEnum), Value);
 
     /// <summary>

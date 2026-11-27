@@ -9,7 +9,7 @@
 
 Bu belge, Milestone 1’de doğrulanan Source Generator mimarisini açıklar. **Kabul edilen** kararları **geçici** teknik seçimlerden ayırır. Onaylanmamış ürün önerileri “Kabul edildi” olarak işaretlenmez.
 
-Lookup, equality ve SMARTENUM003–SMARTENUM005 tanıları Milestone 1’den sonra uygulandı. Bu olgular aşağıda kayıtlıdır. Bu belge ADR-002 kararını değiştirmez.
+Lookup, equality ve SMARTENUM003–SMARTENUM005 tanıları Milestone 1’den sonra uygulandı. SMARTENUM006 iç içe alan türlerini reddeder ve onlar için kaynak üretmez. Bu olgular aşağıda kayıtlıdır. Bu belge ADR-002 kararını değiştirmez.
 
 ## 1. Bağlam ve problem
 
@@ -140,7 +140,7 @@ Generator:
 - `public static readonly` alanların derleme zamanı keşfi.
 - Üretilen `ISmartEnumGenerated<T>` uygulaması.
 - Statik örnek dizisi.
-- SMARTENUM001–SMARTENUM005 tanıları.
+- SMARTENUM001–SMARTENUM006 tanıları.
 
 Core (`src/SmartEnum`):
 
@@ -153,14 +153,15 @@ Core (`src/SmartEnum`):
 
 1. Sözdizimi predikatı: base listesi olan class/record.
 2. Anlamsal filtre: taban tür kimliği `SmartEnum.SmartEnum<TEnum, TValue>` ve `TEnum` bildiren türdür (yalnızca string eşleştirme değil; namespace + metadata kimliği).
-3. `partial` zorunlu (aksi halde SMARTENUM001). Partial olmayan alan için keşif kaynağı üretilmez.
-4. Türü alan türüne eşit olan `public static readonly` alanları topla.
-5. İlgisiz statik alanları yok say (`string`, `int` vb.).
-6. `readonly` olmayan `public static` alan-türündeki alanlar için SMARTENUM002 bildir. Bu alanlar üretilen diziye girmez.
-7. `name` ve `value` adlı kurucu argümanları yinelenen derleme zamanı sabiti olduğunda SMARTENUM003 ve SMARTENUM004 bildir.
-8. Geçerli örnek alanı kalmadığında SMARTENUM005 bildir. Üretim yine boş bir dizi yazar. Tanı şiddeti Error olduğu için tüketici derlemesi başarısız olur.
+3. Alan başka bir türün içindeyse SMARTENUM006 bildir ve kaynak üretme. Bu alan için başka bir SmartEnum tanısı bildirilmez.
+4. `partial` zorunlu (aksi halde SMARTENUM001). Partial olmayan alan için keşif kaynağı üretilmez.
+5. Türü alan türüne eşit olan `public static readonly` alanları topla.
+6. İlgisiz statik alanları yok say (`string`, `int` vb.).
+7. `readonly` olmayan `public static` alan-türündeki alanlar için SMARTENUM002 bildir. Bu alanlar üretilen diziye girmez.
+8. `name` ve `value` adlı kurucu argümanları yinelenen derleme zamanı sabiti olduğunda SMARTENUM003 ve SMARTENUM004 bildir.
+9. Geçerli örnek alanı kalmadığında SMARTENUM005 bildir. Üretim yine boş bir dizi yazar. Tanı şiddeti Error olduğu için tüketici derlemesi başarısız olur.
 
-Doğrulanmış bildirim şekli: üst düzey, generic olmayan `partial` class. Nested türler ve açık generic alanlar desteklenmiş sayılmaz.
+Doğrulanmış bildirim şekli: üst düzey, generic olmayan `partial` class. İç içe SmartEnum alanları SMARTENUM006 ile reddedilir ve onlar için kaynak üretilmez. Açık generic alanlar desteklenmez.
 
 ### Tanı kataloğu
 
@@ -173,8 +174,9 @@ Her tanımlayıcı kategori `SmartEnum.Generators`, şiddet Error ve varsayılan
 | SMARTENUM003 | Duplicate SmartEnum Name | İki geçerli alan, `name` parametresine aynı derleme zamanı sabitini geçirir. Karşılaştırma ordinaldır. | `SmartEnum domain '{0}' declares duplicate Name '{1}' on fields '{2}' and '{3}'` |
 | SMARTENUM004 | Duplicate SmartEnum Value | İki geçerli alan, `value` parametresine aynı null olmayan derleme zamanı sabitini geçirir. | `SmartEnum domain '{0}' declares duplicate Value '{1}' on fields '{2}' and '{3}'` |
 | SMARTENUM005 | SmartEnum domain has no instances | Alanda geçerli `public static readonly` örnek yoktur. | `SmartEnum domain '{0}' has no valid public static readonly instances` |
+| SMARTENUM006 | Nested SmartEnum domain types are not supported | Alan başka bir türün içindedir. Bu alan için kaynak üretilmez. | `SmartEnum domain '{0}' is nested inside another type and is not supported; declare the domain as a top-level type` |
 
-Derleme zamanı sabiti olmayan bir `name` veya `value` argümanı SMARTENUM003 ve SMARTENUM004 tarafından atlanır. Runtime registry doğrulaması yinelenen name ve value değerlerini yine reddeder. Seçilen kurucunun public olması gerekmez. Parametreler `name` ve `value` adlarıyla tanınır. Sabitler `SemanticModel.GetConstantValue` ile okunur.
+Derleme zamanı sabiti olmayan bir `name` veya `value` argümanı SMARTENUM003 ve SMARTENUM004 tarafından atlanır. Runtime registry doğrulaması yinelenen name ve value değerlerini yine reddeder. Seçilen kurucunun public olması gerekmez. Parametreler `name` ve `value` adlarıyla tanınır. Argüman bağlama, derleyicinin nesne oluşturma işlemini kullanır (`IObjectCreationOperation` ve `IArgumentOperation.Parameter`). Sabitler bu argüman işleminden okunur; atlanmış opsiyonel parametrenin açık derleme zamanı varsayılanı da buna dahildir.
 
 ### Üretim
 
@@ -245,9 +247,9 @@ ADR-002’ye bakın. Özet: reflection, elle registry ve `ModuleInitializer` red
 ## 15. Generator sınırlamaları
 
 - Üst düzey, non-generic alanlar doğrulanmış yoldur.
-- Nested türler ve açık generic alanlar desteklenmiş sayılmaz.
+- İç içe SmartEnum alanları SMARTENUM006 ile reddedilir. Onlar için kaynak üretilmez. Açık generic alanlar desteklenmez.
 - Generator lookup, equality veya serialization üretmez. Lookup ve equality Core üzerindedir.
-- SMARTENUM001–SMARTENUM005 tanıları uygulanmıştır.
+- SMARTENUM001–SMARTENUM006 tanıları uygulanmıştır.
 - Generator, entegrasyon testlerinde Analyzer `ProjectReference` olarak bağlanır. NuGet paketleme geçicidir.
 
 ## 16. Test stratejisi
@@ -277,7 +279,7 @@ Integration.Tests         — Core + Generators (Analyzer olarak)
 ## 18. Gelecek genişletme düşünceleri (geçici)
 
 - Generator’ı Core NuGet paketine analyzer olarak paketlemek.
-- Nested ve açık generic alan desteğini, bu desteği iddia etmeden önce testlerle eklemek.
+- İç içe alan üretimi uygulanmamıştır. İç içe alanlar SMARTENUM006 ile reddedilir. Açık generic alan desteği gelecek iş olarak kalır.
 - Ayrı Native AOT / trim doğrulama kilometre taşı.
 
 Lookup ve equality Core’da uygulanmıştır. Generator bu üyeleri üretmez. Derleme zamanı sabitleri için SMARTENUM003 ve SMARTENUM004 tanıları uygulanmıştır.
@@ -292,7 +294,7 @@ Lookup ve equality Core’da uygulanmıştır. Generator bu üyeleri üretmez. D
 | Static abstract dispatch | Kabul edildi |
 | ModuleInitializer keşfi yok | Kabul edildi |
 | CS9203-güvenli statik dizi üretimi | Geçici uygulama detayı (doğruluk odaklı) |
-| Diagnostic kimlikleri SMARTENUM001–SMARTENUM005 | Uygulandı. 001 ve 002 bu keşif tasarımındandır. 003, 004 ve 005 ADR-003 ile kabul edildi. |
+| Diagnostic kimlikleri SMARTENUM001–SMARTENUM006 | Uygulandı. 001 ve 002 bu keşif tasarımındandır. 003, 004 ve 005 ADR-003 ile kabul edildi. 006 iç içe alanları reddeder. |
 | NuGet paketleme topolojisi | Geçici |
-| Nested/generic alanlar | Milestone 1 iddiası dışında |
+| İç içe alanlar | SMARTENUM006 ile reddedilir. Açık generic alanlar mevcut iddianın dışında kalır. |
 | Native AOT kanıtlandı | İddia edilmiyor |

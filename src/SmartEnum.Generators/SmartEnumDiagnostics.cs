@@ -45,4 +45,12 @@ internal static class SmartEnumDiagnostics
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
+
+    public static readonly DiagnosticDescriptor NestedDomainUnsupported = new(
+        id: "SMARTENUM006",
+        title: "Nested SmartEnum domain types are not supported",
+        messageFormat: "SmartEnum domain '{0}' is nested inside another type and is not supported; declare the domain as a top-level type",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
 }
