@@ -28,9 +28,6 @@
     -->
     <TreatWarningsAsErrors Condition="'$(ContinuousIntegrationBuild)' == 'true'">true</TreatWarningsAsErrors>
 
-    <!-- XML documentation for packable library projects (tests typically set IsPackable=false) -->
-    <GenerateDocumentationFile Condition="'$(IsPackable)' == 'true'">true</GenerateDocumentationFile>
-
     <!--
       Verify maintenance-fee SponsorCheck: SmartEnum is a non-revenue MIT open-source project.
       Renew Verify_SponsorshipExemptionUntil at least annually (max 12 months ahead).

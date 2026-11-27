@@ -1,0 +1,11 @@
+<Project>
+  <!--
+    Evaluated after the project body, so csproj IsPackable and explicit
+    GenerateDocumentationFile values are already known. Only fill the default
+    when a packable project left the property unset.
+  -->
+  <PropertyGroup>
+    <GenerateDocumentationFile
+      Condition="'$(GenerateDocumentationFile)' == '' and '$(IsPackable)' == 'true'">true</GenerateDocumentationFile>
+  </PropertyGroup>
+</Project>

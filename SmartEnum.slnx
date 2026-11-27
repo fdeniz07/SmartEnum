@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/SmartEnum.Generators/SmartEnum.Generators.csproj" />
     <Project Path="src/SmartEnum/SmartEnum.csproj" />
+    <Project Path="src/SmartEnum.Packaging/SmartEnum.Packaging.csproj" />
   </Folder>
   <Folder Name="/tests/" />
   <Folder Name="/tests/generators/">

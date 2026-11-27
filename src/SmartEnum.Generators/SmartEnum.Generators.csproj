@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
@@ -10,7 +10,7 @@
     <IsRoslynComponent>true</IsRoslynComponent>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <IncludeBuildOutput>false</IncludeBuildOutput>
-    <IsPackable>true</IsPackable>
+    <IsPackable>false</IsPackable>
     <DevelopmentDependency>true</DevelopmentDependency>
     <!-- Avoid CS1591 noise on internal generator helpers while docs are generated for packable projects -->
     <NoWarn>$(NoWarn);CS1591;RS2008</NoWarn>

@@ -1,0 +1,83 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>SmartEnum.Packaging</AssemblyName>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <IsPackable>true</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <PackageId>SmartEnum</PackageId>
+    <Version>1.0.0-preview.1</Version>
+    <Authors>Fatih Deniz</Authors>
+    <Description>Lightweight Smart Enum for .NET</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/fdeniz07/SmartEnum</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
+  </PropertyGroup>
+
+  <!--
+    Packaging-only project. Core and Generator must not reference each other.
+    These references exist to build the outputs before pack. They are not compile
+    or NuGet dependencies of the shipping package.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\SmartEnum\SmartEnum.csproj">
+      <PrivateAssets>all</PrivateAssets>
+    </ProjectReference>
+    <ProjectReference Include="..\SmartEnum.Generators\SmartEnum.Generators.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <PrivateAssets>all</PrivateAssets>
+    </ProjectReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <!--
+    IncludeBuildOutput is false, so _WalkEachTargetPerFramework does not call
+    _GetBuildOutputFilesWithTfm. Package files are therefore added before
+    _GetPackageFiles from GetTargetPath, with explicit package paths.
+  -->
+  <Target Name="IncludeShippingOutputs" BeforeTargets="_GetPackageFiles">
+    <MSBuild
+      Projects="$(MSBuildThisFileDirectory)..\SmartEnum\SmartEnum.csproj"
+      Targets="GetTargetPath"
+      Properties="Configuration=$(Configuration);TargetFramework=net10.0">
+      <Output TaskParameter="TargetOutputs" ItemName="_CoreAssembly" />
+    </MSBuild>
+    <MSBuild
+      Projects="$(MSBuildThisFileDirectory)..\SmartEnum\SmartEnum.csproj"
+      Targets="DocumentationProjectOutputGroup"
+      Properties="Configuration=$(Configuration);TargetFramework=net10.0">
+      <Output TaskParameter="TargetOutputs" ItemName="_CoreDocumentation" />
+    </MSBuild>
+    <MSBuild
+      Projects="$(MSBuildThisFileDirectory)..\SmartEnum.Generators\SmartEnum.Generators.csproj"
+      Targets="GetTargetPath"
+      Properties="Configuration=$(Configuration);TargetFramework=netstandard2.0">
+      <Output TaskParameter="TargetOutputs" ItemName="_GeneratorAssembly" />
+    </MSBuild>
+
+    <Error
+      Condition="'@(_CoreAssembly)' == '' or !Exists('%(_CoreAssembly.Identity)')"
+      Text="Core GetTargetPath did not return an existing assembly." />
+    <Error
+      Condition="'@(_CoreDocumentation)' == '' or !Exists('%(_CoreDocumentation.Identity)')"
+      Text="Core DocumentationProjectOutputGroup did not return an existing XML documentation file." />
+    <Error
+      Condition="'@(_GeneratorAssembly)' == '' or !Exists('%(_GeneratorAssembly.Identity)')"
+      Text="Generator GetTargetPath did not return an existing assembly." />
+
+    <ItemGroup>
+      <None Include="@(_CoreAssembly)" Pack="true" PackagePath="lib/net10.0/%(Filename)%(Extension)" />
+      <None Include="@(_CoreDocumentation)" Pack="true" PackagePath="lib/net10.0/%(Filename)%(Extension)" />
+      <None Include="@(_GeneratorAssembly)" Pack="true" PackagePath="analyzers/dotnet/cs/%(Filename)%(Extension)" />
+    </ItemGroup>
+  </Target>
+
+</Project>
