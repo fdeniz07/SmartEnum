@@ -16,8 +16,8 @@ namespace SmartEnum.Generators;
 [Generator(LanguageNames.CSharp)]
 public sealed class SmartEnumGenerator : IIncrementalGenerator
 {
-    private const string SmartEnumNamespace = "SmartEnum";
-    private const string SmartEnumTypeName = "SmartEnum";
+    private const string CoreAssemblyName = "SmartEnum";
+    private const string CoreMetadataName = "SmartEnum.SmartEnum`2";
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         // Multiple partial declarations of the same type can each match the syntax
@@ -64,7 +64,7 @@ public sealed class SmartEnumGenerator : IIncrementalGenerator
             return null;
         }
 
-        return IsSmartEnumDomain(typeSymbol, out _) ? typeSymbol : null;
+        return IsSmartEnumDomain(typeSymbol, context.SemanticModel.Compilation, out _) ? typeSymbol : null;
     }
 
     private static ImmutableArray<DomainCandidate> DeduplicateDomainSymbols(
@@ -92,17 +92,30 @@ public sealed class SmartEnumGenerator : IIncrementalGenerator
         return builder.ToImmutable();
     }
 
-    private static bool IsSmartEnumDomain(INamedTypeSymbol typeSymbol, out INamedTypeSymbol? smartEnumBase)
+    private static bool IsSmartEnumDomain(
+        INamedTypeSymbol typeSymbol,
+        Compilation compilation,
+        out INamedTypeSymbol? smartEnumBase)
     {
         smartEnumBase = null;
 
+        // A missing or ambiguous metadata name is not a Core match.
+        // The assembly simple name is only a sanity check, not a cryptographic identity.
+        if (compilation.GetTypeByMetadataName(CoreMetadataName) is not INamedTypeSymbol coreDefinition
+            || coreDefinition.ContainingAssembly.Identity.Name != CoreAssemblyName)
+        {
+            return false;
+        }
+
         for (INamedTypeSymbol? current = typeSymbol.BaseType; current is not null; current = current.BaseType)
         {
-            if (current is { IsGenericType: true, TypeArguments.Length: 2 }
-                && current.Name == SmartEnumTypeName
-                && current.ContainingNamespace?.ToDisplayString() == SmartEnumNamespace
-                && current.ContainingType is null
-                && current.TypeArguments[0].Equals(typeSymbol, SymbolEqualityComparer.Default))
+            if (!SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, coreDefinition))
+            {
+                continue;
+            }
+
+            if (current.TypeArguments.Length == 2
+                && SymbolEqualityComparer.Default.Equals(current.TypeArguments[0], typeSymbol))
             {
                 smartEnumBase = current;
                 return true;

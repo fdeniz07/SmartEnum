@@ -12,10 +12,20 @@ internal static class GeneratorTestHelpers
 
     public static (GeneratorDriverRunResult Result, Compilation OutputCompilation) RunGenerator(
         params (string FilePath, string Source)[] sources)
+        => RunGenerator(additionalReferences: [], sources);
+
+    public static (GeneratorDriverRunResult Result, Compilation OutputCompilation) RunGenerator(
+        IReadOnlyCollection<MetadataReference> additionalReferences,
+        params (string FilePath, string Source)[] sources)
     {
         if (sources is null || sources.Length == 0)
         {
             throw new ArgumentException("At least one source file is required.", nameof(sources));
+        }
+
+        if (additionalReferences is null)
+        {
+            throw new ArgumentNullException(nameof(additionalReferences));
         }
 
         CSharpParseOptions parseOptions = new(LanguageVersion.CSharp13);
@@ -31,7 +41,7 @@ internal static class GeneratorTestHelpers
         var compilation = CSharpCompilation.Create(
             assemblyName: "GeneratorTests",
             syntaxTrees: syntaxTrees,
-            references: CreateMetadataReferences(),
+            references: CreateMetadataReferences().AddRange(additionalReferences),
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
                 .WithNullableContextOptions(NullableContextOptions.Enable));
 
