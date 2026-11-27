@@ -6,51 +6,58 @@
 [![C#](https://img.shields.io/badge/C%23-14-239120)](https://learn.microsoft.com/dotnet/csharp/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-SmartEnum is an open-source library that replaces a traditional .NET enum when a closed set of values needs a name, a typed value, and ordinary C# behavior.
+SmartEnum replaces a traditional .NET `enum` when a closed set of values needs a **name**, a **typed value**, and ordinary C# behavior—lookup, equality, and room for domain methods—without reflection or manual registration.
 
-The Core library and its Source Generator are implemented in this repository. A consumer domain is a `partial` type derived from `SmartEnum<TEnum, TValue>`. The generator discovers the static instances at compile time. Core then validates that set, looks instances up, and compares them.
+A consumer declares a `partial` type that inherits `SmartEnum<TEnum, TValue>`. An incremental Roslyn source generator discovers the static instances at compile time. Core validates that set once, then serves lookup and comparison APIs.
 
-> **Project status:** Core lookup, registry validation, and equality are implemented. NuGet packaging and the integration packages below are not published. The walkthrough is [docs/USAGE.md](docs/USAGE.md).
+## Key features
 
-## Goals
+- Strongly typed named values with a small public API surface
+- Compile-time instance discovery (no reflection, no assembly scanning)
+- Validated immutable registry and discovery-ordered `List`
+- Name/value lookup: `From*`, `TryFrom*`, `Contains*`
+- Value-based equality (`==` / `!=` / `Equals`)
+- Core assembly with **zero runtime package dependencies**
+- Single NuGet package that ships Core + the source generator together
+- .NET 10 / C# 14, MIT licensed
 
-- Lightweight API with a small conceptual surface.
-- Core assembly with **zero external package dependencies**.
-- Strongly typed named values with room for domain behavior.
-- Source Generator kept in its own project, with no compile-time reference from Core back to the generator.
-- .NET 10 and C# 14.
-- MIT licensed and free to use.
+## Installation / package status
 
-## Implemented API
+The shipping package id is **`SmartEnum`**. It is produced by `src/SmartEnum.Packaging` and includes:
 
-```csharp
-public abstract class SmartEnum<TEnum, TValue> : IEquatable<TEnum>
-    where TEnum : SmartEnum<TEnum, TValue>, ISmartEnumGenerated<TEnum>
-    where TValue : notnull
+| Package content | Location |
+| --- | --- |
+| Core runtime | `lib/net10.0/SmartEnum.dll` |
+| XML documentation | `lib/net10.0/SmartEnum.xml` |
+| Source generator | `analyzers/dotnet/cs/SmartEnum.Generators.dll` |
+| Package readme | `README.md` |
+
+There is **no** separately distributed `SmartEnum.Generators` package. One `PackageReference` to `SmartEnum` restores both the runtime types and the analyzer.
+
+> **Publication status:** The package layout is implemented in this repository (preview version `1.0.0-preview.1`). It is **not** claimed to be published on NuGet.org from this documentation. Until a public feed listing is available, build from source or consume a locally packed nupkg.
+
+Intended consumer reference (when the package is available on your feed):
+
+```xml
+<PackageReference Include="SmartEnum" Version="1.0.0-preview.1" />
 ```
 
-`TEnum` is the concrete domain type. `TValue` is the non-nullable underlying value. `ISmartEnumGenerated<TEnum>` is the technical contract the generator implements. Consumers write `partial` and the static fields. They do not write `GetInstances()`.
+Consumers do **not** manually implement `ISmartEnumGenerated<T>` and do **not** need a second generator package reference.
 
-| Member | Behavior |
-| --- | --- |
-| `Name` | Canonical instance name. |
-| `Value` | Underlying value. |
-| `Registry` | Validated, immutable catalog for this domain. The only public registry entry. |
-| `List` | The same collection as `Registry.Items`, in discovery order. |
-| `FromName` / `FromValue` | Return the registered instance or throw. |
-| `TryFromName` / `TryFromValue` | `TryFromName` returns `false` for null, empty, and whitespace names without reading the registry. `TryFromValue` returns `false` for null. Every other value, including an empty or whitespace string, uses the normal value lookup. A miss returns `false`. |
-| `ContainsName` / `ContainsValue` | Same classification as the `Try` methods, without the instance. |
-| `Equals`, `==`, `!=` | Equal when the domain type and `Value` match. `Name`, the runtime subtype, and registry membership are not part of equality. |
+Walkthrough with full API notes: [docs/USAGE.md](docs/USAGE.md).
 
-`GetHashCode()` is `HashCode.Combine(typeof(TEnum), Value)`. Name comparison is ordinal. Value comparison uses `EqualityComparer<TValue>.Default`. Two different closed domains do not support `==` or `!=` (CS0019). `Equals(object?)` returns `false` across domains.
-
-A short domain looks like this. The full sample, lookups, and equality cases are in [docs/USAGE.md](docs/USAGE.md).
+## Quick Start
 
 ```csharp
+using SmartEnum;
+
+namespace Demo;
+
 public sealed partial class OrderStatus : SmartEnum<OrderStatus, int>
 {
     public static readonly OrderStatus Pending = new("Pending", 1);
-    public static readonly OrderStatus Approved = new("Approved", 2);
+    public static readonly OrderStatus Processing = new("Processing", 2);
+    public static readonly OrderStatus Completed = new("Completed", 3);
 
     private OrderStatus(string name, int value)
         : base(name, value)
@@ -59,74 +66,124 @@ public sealed partial class OrderStatus : SmartEnum<OrderStatus, int>
 }
 ```
 
-## What the generator does
+`partial` is required: the source generator emits a second partial declaration that implements `ISmartEnumGenerated<OrderStatus>` and provides the discovered instances. You declare the type, the static fields, and the constructor—not `GetInstances()`.
 
-`src/SmartEnum.Generators` is an incremental Roslyn generator. For each eligible `partial` domain it emits `ISmartEnumGenerated<T>` and a static array of the `public static readonly` fields. Diagnostics are SMARTENUM001 through SMARTENUM006. Details are in [docs/design/SOURCE_GENERATOR.md](docs/design/SOURCE_GENERATOR.md).
+Practical usage:
 
-Core, in `src/SmartEnum`, owns registry validation, lookup, equality, and the runtime exceptions. The generator does not emit those APIs.
+```csharp
+OrderStatus pending = OrderStatus.FromName("Pending");
+OrderStatus processing = OrderStatus.FromValue(2);
 
-Accepted decisions: [docs/architecture/decisions/README.md](docs/architecture/decisions/README.md).
+bool found = OrderStatus.TryFromName("Completed", out OrderStatus? completed);
+bool known = OrderStatus.ContainsName("Pending");
 
-## Packages
+var all = OrderStatus.List; // Pending, Processing, Completed
 
-| Package | State in this repository | Responsibility |
-| --- | --- | --- |
-| `SmartEnum` | Implemented. No NuGet package has been published. | Registry, lookup, equality |
-| `SmartEnum.Generators` | Implemented. Referenced by tests as an analyzer. Not yet bundled into the Core package. | Compile-time discovery |
-
-These packages are **planned** and are not projects in this repository:
-
-| Planned package | Responsibility |
-| --- | --- |
-| `SmartEnum.SystemTextJson` | System.Text.Json support, without a JSON dependency in Core |
-| `SmartEnum.EntityFrameworkCore` | EF Core persistence, in a separate package |
-
-JSON representation and EF Core conversion are still design topics. They are not implemented.
-
-## Target framework
-
-`global.json` pins SDK `10.0.404`, with `rollForward` set to `latestFeature` and `allowPrerelease` set to `false`. The language version is C# 14. Tests run on Microsoft.Testing.Platform.
-
-## Repository layout
-
-```text
-SmartEnum/
-├── src/
-│   ├── SmartEnum/
-│   └── SmartEnum.Generators/
-├── tests/
-│   ├── unit/SmartEnum.Tests/
-│   ├── generators/SmartEnum.Generators.Tests/
-│   └── integration/SmartEnum.Generator.IntegrationTests/
-├── docs/
-├── global.json
-├── LICENSE
-├── README.md
-└── SmartEnum.slnx
+bool same = OrderStatus.Pending == pending; // true
 ```
+
+## Lookup examples
+
+```csharp
+OrderStatus pending = OrderStatus.FromName("Pending");
+OrderStatus alsoPending = OrderStatus.FromValue(1);
+
+bool ok = OrderStatus.TryFromName("Pending", out OrderStatus? match);
+bool missing = OrderStatus.TryFromName("Missing", out _);
+bool hasName = OrderStatus.ContainsName("Processing");
+bool hasValue = OrderStatus.ContainsValue(3);
+```
+
+Name comparison is **ordinal** (case-sensitive, no trim). `TryFromName` / `ContainsName` return `false` for null, empty, and whitespace without throwing. `FromName` / `FromValue` throw on invalid or missing input. Details: [docs/USAGE.md](docs/USAGE.md).
+
+## Equality and comparison
+
+Equality is **domain type + `Value`** (`EqualityComparer<TValue>.Default`). `Name`, runtime subtype, and registry membership are not part of equality.
+
+```csharp
+bool same = OrderStatus.Pending == OrderStatus.FromValue(1); // true
+bool different = OrderStatus.Pending == OrderStatus.Completed; // false
+bool notSame = OrderStatus.Pending != OrderStatus.Completed; // true
+```
+
+Different domains do not support `==` / `!=` between each other (CS0019). `Equals(object?)` returns `false` across domains.
+
+## How source generation works
+
+1. You declare a top-level `partial` class inheriting `SmartEnum<TEnum, TValue>` with `public static readonly` instances.
+2. `SmartEnum.Generators` (shipped under `analyzers/dotnet/cs` in the `SmartEnum` package) discovers those fields at compile time.
+3. It emits `ISmartEnumGenerated<TEnum>` and a static array of instances (diagnostics SMARTENUM001–SMARTENUM006).
+4. The first operation that actually accesses the registry (`Registry`, `List`, or a lookup that reaches the catalog) validates the set (non-empty, no nulls, unique names and values) and publishes an immutable catalog. Early-return input checks—such as `TryFromName` / `ContainsName` on null, empty, or whitespace, `TryFromValue` / `ContainsValue` on null, and the pre-registry argument checks on `FromName` / `FromValue`—do **not** initialize the registry.
+
+There is **no** reflection-based discovery, **no** runtime assembly scanning, **no** manual registration API, and **no** production `ModuleInitializer` side effect. Design notes: [docs/design/SOURCE_GENERATOR.md](docs/design/SOURCE_GENERATOR.md).
+
+## Supported domain declarations and limitations
+
+**Supported (verified):** top-level, non-generic, `partial` classes.
+
+**Not supported today:**
+
+- Nested domain types (diagnostic **SMARTENUM006**; no source is generated)
+- Generic domain types
+- Non-`partial` domains (**SMARTENUM001**)
+
+## Package architecture
+
+| Project | Role |
+| --- | --- |
+| `src/SmartEnum` | Core runtime (`IsPackable=false`; restore id `SmartEnum.Core` only to avoid solution ambiguity) |
+| `src/SmartEnum.Generators` | Roslyn generator (`IsPackable=false`) |
+| `src/SmartEnum.Packaging` | Produces the shipping `SmartEnum` nupkg |
+
+Core and Generator do **not** `ProjectReference` each other. Packaging gathers `GetTargetPath` / documentation outputs into one package. Decision record: [ADR-006](docs/architecture/decisions/ADR-006-single-nuget-package-distribution.md).
+
+Planned (not in this repository): optional `SmartEnum.SystemTextJson` and `SmartEnum.EntityFrameworkCore` integration packages. JSON and EF Core conversion are not implemented in Core.
 
 ## Build and test
 
 ```powershell
 git clone https://github.com/fdeniz07/SmartEnum.git
 cd SmartEnum
-dotnet test SmartEnum.slnx -p:TreatWarningsAsErrors=true
+dotnet restore SmartEnum.slnx
+dotnet build SmartEnum.slnx -c Release --no-restore
+dotnet test SmartEnum.slnx -c Release --no-build
 ```
 
-A local consumer references `src/SmartEnum/SmartEnum.csproj` and references `src/SmartEnum.Generators/SmartEnum.Generators.csproj` with `OutputItemType="Analyzer"` and `ReferenceOutputAssembly="false"`.
+`global.json` pins SDK `10.0.404` (`rollForward`: `latestFeature`, `allowPrerelease`: `false`). Tests use Microsoft.Testing.Platform. CI runs on GitHub Actions (`.github/workflows/ci.yml`).
 
-## Design principles
+## Repository layout
 
-1. **Dependency discipline.** The Core assembly has no external package dependencies.
-2. **Explicit behavior.** Lookup, equality, and failure behavior are specified and tested.
-3. **Stable public API.** Accepted ADRs stay in force. Packaging and integrations are still open.
-4. **Optional integrations.** Framework-specific support belongs in separate packages.
-5. **Testability.** Unit, generator, and integration tests cover the implemented contract.
-6. **Maintainability.** Prefer a direct implementation over an extra abstraction layer.
+```text
+SmartEnum/
+├── src/
+│   ├── SmartEnum/                         # Core runtime
+│   ├── SmartEnum.Generators/              # Source generator
+│   └── SmartEnum.Packaging/               # Shipping NuGet package project
+├── tests/
+│   ├── unit/SmartEnum.Tests/
+│   ├── generators/SmartEnum.Generators.Tests/
+│   └── integration/
+│       ├── SmartEnum.Generator.IntegrationTests/
+│       └── SmartEnum.Package.IntegrationTests/
+├── docs/
+│   ├── USAGE.md
+│   ├── architecture/decisions/            # ADRs (including ADR-006)
+│   └── design/SOURCE_GENERATOR.md
+├── .github/workflows/ci.yml
+├── global.json
+├── LICENSE
+├── README.md
+└── SmartEnum.slnx
+```
 
-## Contributing
+## Documentation
 
-Core behavior for discovery, registry validation, lookup, and equality is accepted. Open an issue before proposing a new public API. Contribution guidelines beyond this README are still to be written.
+| Document | Content |
+| --- | --- |
+| [docs/USAGE.md](docs/USAGE.md) | Consumer usage, lookup, equality, limitations |
+| [docs/design/SOURCE_GENERATOR.md](docs/design/SOURCE_GENERATOR.md) | Generator design and diagnostics |
+| [docs/architecture/decisions/README.md](docs/architecture/decisions/README.md) | Accepted ADRs |
+| [ADR-006](docs/architecture/decisions/ADR-006-single-nuget-package-distribution.md) | Single NuGet package distribution |
 
 ## License
 

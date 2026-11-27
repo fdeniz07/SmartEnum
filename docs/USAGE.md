@@ -1,29 +1,66 @@
 # SmartEnum — Usage
 
-This page shows the implemented Core API and the Source Generator contract. It matches `tests/integration/SmartEnum.Generator.IntegrationTests/OrderStatus.cs` and `PayStatus.cs`.
+Consumer guide for the implemented Core API and the Source Generator shipped in the **`SmartEnum`** NuGet package.
 
-There is no published NuGet package yet. Build against the projects in this repository.
+Examples align with `tests/integration/SmartEnum.Generator.IntegrationTests` and the isolated package consumer covered by `tests/integration/SmartEnum.Package.IntegrationTests`.
 
-## Build requirements
+## Package installation
 
-`global.json` selects SDK `10.0.404` (`rollForward`: `latestFeature`, `allowPrerelease`: `false`). The repo language version is C# 14.
+Add a single package reference. The package contains the Core runtime, XML docs, and the generator under `analyzers/dotnet/cs`. There is no separate `SmartEnum.Generators` package to install.
 
-A consumer project needs two references:
+```xml
+<PackageReference Include="SmartEnum" Version="1.0.0-preview.1" />
+```
 
-- `src/SmartEnum/SmartEnum.csproj`, the Core assembly. It has no runtime package dependencies.
-- `src/SmartEnum.Generators/SmartEnum.Generators.csproj` as an analyzer, with `ReferenceOutputAssembly="false"`.
+> **Publication caveat:** Preview packaging is implemented in this repository (`1.0.0-preview.1`). This document does **not** claim the package is already on NuGet.org. Use a feed that hosts the packed nupkg, or pack locally as shown below.
 
-Core does not reference the generator. The generator does not reference Core. Discovery is emitted into the consumer compilation.
+### Pack and consume from a local feed
+
+Work from the repository root. Pack the shipping project (`src/SmartEnum.Packaging/SmartEnum.Packaging.csproj`) into a local feed folder:
+
+```powershell
+dotnet pack src/SmartEnum.Packaging/SmartEnum.Packaging.csproj -c Release -o ./artifacts/local-feed
+```
+
+This writes `SmartEnum.1.0.0-preview.1.nupkg` to `./artifacts/local-feed` relative to the repo root.
+
+Place (or create) a `nuget.config` in the **repository root**. Relative package source paths are resolved against that config file’s directory, so `./artifacts/local-feed` means `<repo-root>/artifacts/local-feed`. Keep other required sources available (for example nuget.org for test SDK packages); do not add `<clear />` unless you also configure every source the consumer needs:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />
+    <add key="smartenum-local" value="./artifacts/local-feed" />
+  </packageSources>
+</configuration>
+```
+
+Restore the consumer explicitly with that config (still from the repo root, adjusting the project path as needed):
+
+```powershell
+dotnet restore path/to/Consumer.csproj --configfile ./nuget.config
+```
+
+Use the same `PackageReference` as above. The package already includes the generator under `analyzers/dotnet/cs`; no second reference is required.
+
+You do **not** manually implement `ISmartEnumGenerated<T>`. You do **not** add a second analyzer/`ProjectReference` to the generator when consuming the NuGet package.
+
+For contributors working inside this repo without a local feed, integration tests that use an Analyzer `ProjectReference` remain a development convenience—they are not the NuGet consumer model. Prefer the package path described above for real applications.
+
+### Build requirements
+
+`global.json` selects SDK `10.0.404` (`rollForward`: `latestFeature`, `allowPrerelease`: `false`). The repo language version is C# 14. Core has **zero** runtime package dependencies.
 
 From the repository root:
 
 ```powershell
-dotnet test SmartEnum.slnx -p:TreatWarningsAsErrors=true
+dotnet test SmartEnum.slnx -c Release
 ```
 
 ## Domain declaration
 
-The domain type is `partial`. The constructor that the static fields call takes `(string name, int value)` and passes both to the base. The generator reads parameters named `name` and `value`. That constructor may be private, as it is here.
+Declare a **top-level**, **non-generic**, **`partial`** class. Pass `(string name, TValue value)` to the base constructor. The generator discovers `public static readonly` fields whose constructor arguments use parameters named `name` and `value`.
 
 ```csharp
 using SmartEnum;
@@ -33,7 +70,8 @@ namespace Demo;
 public sealed partial class OrderStatus : SmartEnum<OrderStatus, int>
 {
     public static readonly OrderStatus Pending = new("Pending", 1);
-    public static readonly OrderStatus Approved = new("Approved", 2);
+    public static readonly OrderStatus Processing = new("Processing", 2);
+    public static readonly OrderStatus Completed = new("Completed", 3);
 
     private OrderStatus(string name, int value)
         : base(name, value)
@@ -42,21 +80,30 @@ public sealed partial class OrderStatus : SmartEnum<OrderStatus, int>
 }
 ```
 
-`SmartEnum<OrderStatus, int>` requires `OrderStatus` to implement `ISmartEnumGenerated<OrderStatus>`. The generator adds that implementation and a static array of `Pending` and `Approved`. Do not write `GetInstances()` by hand.
+`SmartEnum<OrderStatus, int>` constrains `OrderStatus` to implement `ISmartEnumGenerated<OrderStatus>`. The generator supplies that implementation and the discovered instance array. Do not write `GetInstances()` by hand.
 
-`TValue` is `notnull`. `Name` and `Value` are get-only.
+`TValue` is `notnull`. `Name` and `Value` are get-only properties on the base type.
 
-## Registry and list
+## How the source generator works
+
+1. At compile time, the analyzer from the `SmartEnum` package finds eligible `partial` domains.
+2. It emits a second partial declaration implementing `ISmartEnumGenerated<TEnum>` with compile-time discovered instances.
+3. Diagnostics SMARTENUM001–SMARTENUM006 report declaration problems (for example non-`partial` or nested types).
+4. Core does **not** use reflection, runtime assembly scanning, manual registration, or a production `ModuleInitializer` to find instances.
+
+Design detail: [SOURCE_GENERATOR.md](design/SOURCE_GENERATOR.md). Packaging decision: [ADR-006](architecture/decisions/ADR-006-single-nuget-package-distribution.md).
+
+## Registry and List
 
 ```csharp
 IReadOnlyList<OrderStatus> list = OrderStatus.List;
 SmartEnumRegistry<OrderStatus, int> registry = OrderStatus.Registry;
 
-// List and Registry.Items are the same collection.
+// List and Registry.Items are the same collection instance.
 bool sameCatalog = ReferenceEquals(list, registry.Items);
 ```
 
-The first successful read validates the discovered instances and publishes one registry for the domain. A failed validation throws `SmartEnumValidationException` and later reads throw that same exception instance. An empty set, a null entry, a duplicate name, or a duplicate value fails validation.
+The first successful access validates discovered instances and publishes one immutable registry for the domain. Validation failures throw `SmartEnumValidationException`; later accesses rethrow that same exception instance. An empty set, a null entry, a duplicate name, or a duplicate value fails validation.
 
 ## Lookup
 
@@ -66,19 +113,25 @@ OrderStatus alsoPending = OrderStatus.FromValue(1);
 
 bool found = OrderStatus.TryFromName("Pending", out OrderStatus? match);
 bool missing = OrderStatus.TryFromName("Missing", out OrderStatus? none);
-bool hasApproved = OrderStatus.ContainsName("Approved");
+bool hasCompleted = OrderStatus.ContainsName("Completed");
 bool hasValue = OrderStatus.ContainsValue(2);
 ```
 
-Name comparison is ordinal. `"pending"` and `"PENDING"` do not match `"Pending"`. Leading or trailing spaces are not trimmed.
+Name comparison is **ordinal**. `"pending"` and `"PENDING"` do not match `"Pending"`. Leading or trailing spaces are not trimmed.
 
-`FromName(null)` throws `ArgumentNullException`. `FromName("")` and a whitespace name throw `ArgumentException`. A non-empty name that is not registered throws `KeyNotFoundException`.
+### Null and missing-value behavior
 
-`TryFromName` returns `false` for null, empty, whitespace, and a missing name. `ContainsName` uses the same rule. Neither method throws for those inputs.
+| API | Notable behavior |
+| --- | --- |
+| `FromName(null)` | `ArgumentNullException` |
+| `FromName("")` / whitespace | `ArgumentException` |
+| `FromName` unknown non-empty name | `KeyNotFoundException` |
+| `TryFromName` / `ContainsName` | `false` for null, empty, whitespace, or missing name; does not throw for those inputs |
+| `FromValue` with null runtime value | `ArgumentNullException` |
+| `FromValue` unregistered value | `KeyNotFoundException` |
+| `TryFromValue(null)` / `ContainsValue(null)` | `false` (relevant for reference-type `TValue`, e.g. `string`) |
 
-`FromValue` throws `ArgumentNullException` when the runtime value is null, and `KeyNotFoundException` when the value is not registered. `TryFromValue(null)` and `ContainsValue(null)` return `false`. On `OrderStatus` the value type is `int`, so the null value calls belong on a reference-type value such as `string`.
-
-These methods do not catch `SmartEnumValidationException`. A real lookup still surfaces a failed registry.
+Only operations that access the registry can surface a cached `SmartEnumValidationException`. Early-return input checks do **not** access or initialize the registry—for example `TryFromName` / `ContainsName` on null, empty, or whitespace names; `TryFromValue` / `ContainsValue` on null; and the pre-registry argument checks on `FromName` / `FromValue`. A real name or value lookup that reaches the registry does not catch validation failures.
 
 ## Equality
 
@@ -86,23 +139,21 @@ Equality is the domain type plus `Value`, compared with `EqualityComparer<TValue
 
 ```csharp
 OrderStatus pending = OrderStatus.Pending;
-OrderStatus approved = OrderStatus.Approved;
+OrderStatus completed = OrderStatus.Completed;
 
 bool same = pending == OrderStatus.Pending;
-bool different = pending == approved;
-bool notSame = pending != approved;
+bool different = pending == completed;
+bool notSame = pending != completed;
 
 OrderStatus? none = null;
 OrderStatus? alsoNone = null;
-bool pendingIsNull = pending == none;
-bool bothNull = none == alsoNone;
+bool pendingIsNull = pending == none;   // false
+bool bothNull = none == alsoNone;       // true
 ```
 
-`==` and `!=` are declared on `SmartEnum<TEnum, TValue>`. Both operands may be null. `none == alsoNone` is `true`. `pending == none` is `false`. `!=` is the opposite of `==`.
+`==` and `!=` are declared on `SmartEnum<TEnum, TValue>`. Both operands may be null. `GetHashCode()` combines `typeof(TEnum)` and `Value`, so equal instances work as dictionary keys.
 
-`GetHashCode()` combines `typeof(OrderStatus)` and `Value`. Equal instances have equal hash codes, so `HashSet<OrderStatus>` and `Dictionary<OrderStatus, T>` treat the same value as one key.
-
-A second domain with the same numeric value is not the same type:
+A second domain with the same numeric value is a different type:
 
 ```csharp
 public sealed partial class PayStatus : SmartEnum<PayStatus, int>
@@ -117,15 +168,26 @@ public sealed partial class PayStatus : SmartEnum<PayStatus, int>
 ```
 
 ```csharp
-bool sameObject = OrderStatus.Pending.Equals((object)PayStatus.Card);
+bool sameObject = OrderStatus.Pending.Equals((object)PayStatus.Card); // false
 ```
 
-`sameObject` is `false`. `OrderStatus.Pending == PayStatus.Card` does not compile (CS0019). That expression is intentionally absent from the samples above.
+`OrderStatus.Pending == PayStatus.Card` does not compile (CS0019).
+
+## Supported declarations and limitations
+
+**Supported:** top-level, non-generic, `partial` classes inheriting `SmartEnum<TEnum, TValue>`.
+
+**Not supported:**
+
+- Nested domain types → **SMARTENUM006** (no generated source)
+- Generic domain types
+- Non-`partial` domains → **SMARTENUM001**
 
 ## Where this is tested
 
 - `tests/integration/SmartEnum.Generator.IntegrationTests/OrderStatus.cs`
 - `tests/integration/SmartEnum.Generator.IntegrationTests/PayStatus.cs`
 - `tests/integration/SmartEnum.Generator.IntegrationTests/EqualityIntegrationTests.cs`
+- `tests/integration/SmartEnum.Package.IntegrationTests/` (NuGet package consumer)
 - `tests/unit/SmartEnum.Tests/SmartEnumLookupTests.cs`
 - `tests/unit/SmartEnum.Tests/SmartEnumEqualityTests.cs`
