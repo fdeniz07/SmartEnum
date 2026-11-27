@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>SmartEnum</RootNamespace>
+    <AssemblyName>SmartEnum</AssemblyName>
+    <Description>Lightweight Smart Enum for .NET</Description>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <!--
+    Prototype packaging note: the Source Generator is referenced by consumer/test
+    projects as an Analyzer. Bundling the generator into the Core NuGet package
+    remains a later packaging milestone. Core must not take a ProjectReference to
+    SmartEnum.Generators that would create a reverse compile-time dependency.
+  -->
+
+</Project>

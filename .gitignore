@@ -1,0 +1,105 @@
+## .NET / Visual Studio
+## Adapted for SmartEnum (library-focused). Prefer sharing intentional VS Code
+## workspace config; ignore only local/generated editor state.
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Ll]og/
+[Ll]ogs/
+artifacts/
+.artifacts/
+
+# Visual Studio / IDE
+.vs/
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+*.DotSettings.user
+
+# VS Code — ignore local/generated; keep shared project config
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+.history/
+
+# Rider
+.idea/
+*.sln.iml
+
+# Test & coverage
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.trx
+*.VisualState.xml
+TestResult.xml
+nunit-*.xml
+coverage/
+coverage*.json
+coverage*.xml
+coverage*.info
+*.coverage
+*.coveragexml
+*.received.*
+BenchmarkDotNet.Artifacts/
+
+# NuGet
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+project.lock.json
+project.fragment.lock.json
+*.nuget.props
+*.nuget.targets
+
+# Publish / deploy
+*.publish.xml
+*.azurePubxml
+*.pubxml
+*.publishproj
+publish/
+
+# MSBuild / temporary
+*.binlog
+*.log
+*.tlog
+*.tmp
+*.tmp_proj
+*_wpftmp.csproj
+MSBuild_Logs/
+
+# OS / misc
+.DS_Store
+Thumbs.db
+Desktop.ini
+*~
+*.swp
+*.swo
+
+# Local env / secrets
+*.env
+.env
+.env.*
+!.env.example
+
+# Local History
+**/.localhistory/
+.vshistory/

@@ -1,0 +1,41 @@
+<Project>
+  <PropertyGroup>
+    <!-- Language & nullability -->
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>14</LangVersion>
+
+    <!-- Reproducible builds -->
+    <Deterministic>true</Deterministic>
+
+    <!-- Analyzers suitable for a production library -->
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <AnalysisMode>Default</AnalysisMode>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <!--
+      ContinuousIntegrationBuild enables deterministic path mapping and related
+      CI-friendly settings. Detect common CI environment variables.
+    -->
+    <ContinuousIntegrationBuild
+      Condition="'$(ContinuousIntegrationBuild)' == '' and ('$(CI)' == 'true' or '$(GITHUB_ACTIONS)' == 'true' or '$(TF_BUILD)' == 'true')">true</ContinuousIntegrationBuild>
+
+    <!--
+      TreatWarningsAsErrors: enabled only under CI.
+      Locally, warnings remain visible without blocking iterative development.
+      In CI, the same warnings fail the build so quality gates stay strict.
+    -->
+    <TreatWarningsAsErrors Condition="'$(ContinuousIntegrationBuild)' == 'true'">true</TreatWarningsAsErrors>
+
+    <!-- XML documentation for packable library projects (tests typically set IsPackable=false) -->
+    <GenerateDocumentationFile Condition="'$(IsPackable)' == 'true'">true</GenerateDocumentationFile>
+
+    <!--
+      Verify maintenance-fee SponsorCheck: SmartEnum is a non-revenue MIT open-source project.
+      Renew Verify_SponsorshipExemptionUntil at least annually (max 12 months ahead).
+    -->
+    <Verify_SponsorshipExemption>OpenSource</Verify_SponsorshipExemption>
+    <Verify_SponsorshipExemptionUntil>2027-11</Verify_SponsorshipExemptionUntil>
+  </PropertyGroup>
+</Project>

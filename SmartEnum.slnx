@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SmartEnum.Generators/SmartEnum.Generators.csproj" />
+    <Project Path="src/SmartEnum/SmartEnum.csproj" />
+  </Folder>
+  <Folder Name="/tests/" />
+  <Folder Name="/tests/generators/">
+    <Project Path="tests/generators/SmartEnum.Generators.Tests/SmartEnum.Generators.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/integration/">
+    <Project Path="tests/integration/SmartEnum.Generator.IntegrationTests/SmartEnum.Generator.IntegrationTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/unit/">
+    <Project Path="tests/unit/SmartEnum.Tests/SmartEnum.Tests.csproj" />
+  </Folder>
+</Solution>

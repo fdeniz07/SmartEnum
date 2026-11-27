@@ -5,136 +5,128 @@
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/)
 [![C#](https://img.shields.io/badge/C%23-14-239120)](https://learn.microsoft.com/dotnet/csharp/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/status-in%20development-orange)]()
 
-SmartEnum is an open-source library project that aims to provide a lightweight, strongly typed alternative to traditional .NET enums when an application needs behavior or metadata alongside a finite set of values.
+SmartEnum is an open-source library that replaces a traditional .NET enum when a closed set of values needs a name, a typed value, and ordinary C# behavior.
 
-The project is being designed for modern .NET applications, with a dependency-free core and optional integration packages.
+The Core library and its Source Generator are implemented in this repository. A consumer domain is a `partial` type derived from `SmartEnum<TEnum, TValue>`. The generator discovers the static instances at compile time. Core then validates that set, looks instances up, and compares them.
 
-> **Project status:** Early development. The public API, package boundaries, and behavior are not finalized yet. Examples in this README describe the intended direction and are not a promise of the final API.
+> **Project status:** Core lookup, registry validation, and equality are implemented. NuGet packaging and the integration packages below are not published. The walkthrough is [docs/USAGE.md](docs/USAGE.md).
 
 ## Goals
 
 - Lightweight API with a small conceptual surface.
-- Core package with **zero external package dependencies**.
-- Strongly typed named values with room for domain behavior and metadata.
-- Optional integrations kept in separate packages.
-- Modern .NET 10 and C# 14 target.
-- Clear documentation, tests, and benchmarks.
+- Core assembly with **zero external package dependencies**.
+- Strongly typed named values with room for domain behavior.
+- Source Generator kept in its own project, with no compile-time reference from Core back to the generator.
+- .NET 10 and C# 14.
 - MIT licensed and free to use.
 
-## Package plan
-
-| Package | Responsibility | Dependencies |
-| --- | --- | --- |
-| `SmartEnum` | Core Smart Enum abstractions and behavior | No external package dependencies |
-| `SmartEnum.SystemTextJson` | System.Text.Json serialization support | Core + framework-provided JSON APIs |
-| `SmartEnum.EntityFrameworkCore` | Entity Framework Core integration | Core + compatible EF Core package |
-
-The integration packages are optional. Applications that only need the core functionality should not have to reference JSON or Entity Framework Core packages.
-
-Package versions and compatibility details will be documented when the integrations are implemented.
-
-## Intended usage
-
-A typical Smart Enum represents a closed set of named, typed values that can carry domain-specific data or behavior.
-
-The following is **illustrative pseudocode only**. It is not compilable against a released package and does not define the final API:
+## Implemented API
 
 ```csharp
-// Illustrative concept — final API is not yet defined.
-public sealed class OrderStatus
+public abstract class SmartEnum<TEnum, TValue> : IEquatable<TEnum>
+    where TEnum : SmartEnum<TEnum, TValue>, ISmartEnumGenerated<TEnum>
+    where TValue : notnull
+```
+
+`TEnum` is the concrete domain type. `TValue` is the non-nullable underlying value. `ISmartEnumGenerated<TEnum>` is the technical contract the generator implements. Consumers write `partial` and the static fields. They do not write `GetInstances()`.
+
+| Member | Behavior |
+| --- | --- |
+| `Name` | Canonical instance name. |
+| `Value` | Underlying value. |
+| `Registry` | Validated, immutable catalog for this domain. The only public registry entry. |
+| `List` | The same collection as `Registry.Items`, in discovery order. |
+| `FromName` / `FromValue` | Return the registered instance or throw. |
+| `TryFromName` / `TryFromValue` | `TryFromName` returns `false` for null, empty, and whitespace names without reading the registry. `TryFromValue` returns `false` for null. Every other value, including an empty or whitespace string, uses the normal value lookup. A miss returns `false`. |
+| `ContainsName` / `ContainsValue` | Same classification as the `Try` methods, without the instance. |
+| `Equals`, `==`, `!=` | Equal when the domain type and `Value` match. `Name`, the runtime subtype, and registry membership are not part of equality. |
+
+`GetHashCode()` is `HashCode.Combine(typeof(TEnum), Value)`. Name comparison is ordinal. Value comparison uses `EqualityComparer<TValue>.Default`. Two different closed domains do not support `==` or `!=` (CS0019). `Equals(object?)` returns `false` across domains.
+
+A short domain looks like this. The full sample, lookups, and equality cases are in [docs/USAGE.md](docs/USAGE.md).
+
+```csharp
+public sealed partial class OrderStatus : SmartEnum<OrderStatus, int>
 {
-    public static readonly OrderStatus Pending = new("pending");
-    public static readonly OrderStatus Paid = new("paid");
-    public static readonly OrderStatus Shipped = new("shipped");
+    public static readonly OrderStatus Pending = new("Pending", 1);
+    public static readonly OrderStatus Approved = new("Approved", 2);
 
-    public string Name { get; }
-
-    private OrderStatus(string name) => Name = name;
+    private OrderStatus(string name, int value)
+        : base(name, value)
+    {
+    }
 }
 ```
 
-The final API will be decided through explicit design work and documented before implementation.
+## What the generator does
 
-## Planned integrations
+`src/SmartEnum.Generators` is an incremental Roslyn generator. For each eligible `partial` domain it emits `ISmartEnumGenerated<T>` and a static array of the `public static readonly` fields. Diagnostics are SMARTENUM001 through SMARTENUM006. Details are in [docs/design/SOURCE_GENERATOR.md](docs/design/SOURCE_GENERATOR.md).
 
-### System.Text.Json
+Core, in `src/SmartEnum`, owns registry validation, lookup, equality, and the runtime exceptions. The generator does not emit those APIs.
 
-The optional `SmartEnum.SystemTextJson` package is planned to provide JSON support without adding a JSON dependency to the core package.
+Accepted decisions: [docs/architecture/decisions/README.md](docs/architecture/decisions/README.md).
 
-The exact representation (for example, serializing by name or by value), converter registration, null handling, and unknown-value behavior are design topics still to be decided.
+## Packages
 
-### Entity Framework Core
+| Package | State in this repository | Responsibility |
+| --- | --- | --- |
+| `SmartEnum` | Implemented. No NuGet package has been published. | Registry, lookup, equality |
+| `SmartEnum.Generators` | Implemented. Referenced by tests as an analyzer. Not yet bundled into the Core package. | Compile-time discovery |
 
-The optional `SmartEnum.EntityFrameworkCore` package is planned to support persistence with EF Core.
+These packages are **planned** and are not projects in this repository:
 
-Conversion behavior, model configuration, query translation expectations, and supported EF Core versions will be specified before implementation.
+| Planned package | Responsibility |
+| --- | --- |
+| `SmartEnum.SystemTextJson` | System.Text.Json support, without a JSON dependency in Core |
+| `SmartEnum.EntityFrameworkCore` | EF Core persistence, in a separate package |
 
-## Target framework and language
+JSON representation and EF Core conversion are still design topics. They are not implemented.
 
-The initial target is:
+## Target framework
 
-- .NET 10
-- C# 14
+`global.json` pins SDK `10.0.404`, with `rollForward` set to `latestFeature` and `allowPrerelease` set to `false`. The language version is C# 14. Tests run on Microsoft.Testing.Platform.
 
-The repository will pin its SDK selection so machines with newer SDKs installed do not silently change the intended build toolchain.
-
-## Repository structure
-
-The planned repository layout is:
+## Repository layout
 
 ```text
 SmartEnum/
 ├── src/
 │   ├── SmartEnum/
-│   ├── SmartEnum.SystemTextJson/
-│   └── SmartEnum.EntityFrameworkCore/
+│   └── SmartEnum.Generators/
 ├── tests/
-├── samples/
+│   ├── unit/SmartEnum.Tests/
+│   ├── generators/SmartEnum.Generators.Tests/
+│   └── integration/SmartEnum.Generator.IntegrationTests/
 ├── docs/
-├── .github/
+├── global.json
 ├── LICENSE
 ├── README.md
-└── SmartEnum.sln
+└── SmartEnum.slnx
 ```
 
-The directory structure may evolve as the architecture is finalized.
-
-## Getting started
-
-There is no NuGet package available yet.
-
-Once the first package is published, installation instructions and verified, compilable examples will be added here.
-
-For contributors who want to inspect the project during development:
-
-1. Clone the repository.
-2. Open `SmartEnum.sln` once the solution has been added.
-3. Use the .NET 10 SDK.
-4. Run the test suite after the projects are available.
+## Build and test
 
 ```powershell
 git clone https://github.com/fdeniz07/SmartEnum.git
 cd SmartEnum
+dotnet test SmartEnum.slnx -p:TreatWarningsAsErrors=true
 ```
+
+A local consumer references `src/SmartEnum/SmartEnum.csproj` and references `src/SmartEnum.Generators/SmartEnum.Generators.csproj` with `OutputItemType="Analyzer"` and `ReferenceOutputAssembly="false"`.
 
 ## Design principles
 
-The project will follow these principles:
-
-1. **Dependency discipline** — keep the core free of external dependencies.
-2. **Explicit behavior** — define lookup, equality, identity, and failure behavior precisely.
-3. **Stable public API** — review API design before implementation and avoid unnecessary breaking changes.
-4. **Optional integrations** — framework-specific support belongs in separate packages.
-5. **Testability** — cover normal behavior, edge cases, and invalid input.
-6. **Maintainability** — prefer simple, readable implementation over unnecessary abstraction.
+1. **Dependency discipline.** The Core assembly has no external package dependencies.
+2. **Explicit behavior.** Lookup, equality, and failure behavior are specified and tested.
+3. **Stable public API.** Accepted ADRs stay in force. Packaging and integrations are still open.
+4. **Optional integrations.** Framework-specific support belongs in separate packages.
+5. **Testability.** Unit, generator, and integration tests cover the implemented contract.
+6. **Maintainability.** Prefer a direct implementation over an extra abstraction layer.
 
 ## Contributing
 
-The project is in its early design stage. Before opening a pull request for a feature, please open an issue to discuss the use case and proposed API.
-
-Contribution guidelines, coding conventions, and the development workflow will be documented as the project matures.
+Core behavior for discovery, registry validation, lookup, and equality is accepted. Open an issue before proposing a new public API. Contribution guidelines beyond this README are still to be written.
 
 ## License
 
